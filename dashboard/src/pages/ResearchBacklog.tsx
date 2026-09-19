@@ -61,14 +61,19 @@ function statusMeta(status?: string, hasNewData = false) {
   return { label: "自動追蹤", cls: "border-success/30 bg-bg-success text-txt-success" };
 }
 
-function runStatusLabel(run?: ResearchRun | null) {
+const ACTIVE_RUN_STATUSES = new Set(["QUEUED", "RUNNING", "RESUMING", "STOPPING"]);
+const TERMINAL_RUN_STATUSES = new Set(["SUCCEEDED", "FAILED", "CANCELLED", "TIMED_OUT"]);
+
+function runStatusMessage(run?: ResearchRun | null) {
   const status = String(run?.status || "").toUpperCase();
-  if (!status) return "未開始";
-  if (["QUEUED", "RESUMING"].includes(status)) return "排隊中";
-  if (["RUNNING", "STOPPING"].includes(status)) return "研究中";
-  if (status === "SUCCEEDED") return "完成";
-  if (["FAILED", "CANCELLED", "TIMED_OUT"].includes(status)) return "失敗";
-  return status;
+  if (status === "QUEUED" || status === "RESUMING") return "已排隊，準備研究";
+  if (status === "RUNNING" || status === "STOPPING") return "研究中 · 可離開此頁，背景會繼續";
+  if (status === "SUCCEEDED") {
+    const added = n(run?.original_response?.materials_added ?? run?.material_count ?? 0);
+    return `本輪研究完成 · 新增 ${added} 筆`;
+  }
+  if (["FAILED", "CANCELLED", "TIMED_OUT"].includes(status)) return "本輪研究失敗 · 可重試";
+  return "尚未執行單項研究";
 }
 
 function categoryLabel(category: string) {
@@ -325,6 +330,7 @@ export default function ResearchBacklog() {
   const listRequestSeq = useRef(0);
   const detailRequestSeq = useRef(0);
   const runRequestSeq = useRef(0);
+  const provisionalItemsRef = useRef<Map<string, ResearchBacklogItem>>(new Map());
   const lastRefreshAtRef = useRef(0);
 
   useEffect(() => { selectedIdRef.current = selectedId; if (selectedId) writeSelectedId(selectedId); }, [selectedId]);
@@ -337,24 +343,38 @@ export default function ResearchBacklog() {
       // Always load the canonical full list. Search/status are instant local filters and never start a server round-trip.
       const next = await getResearchBacklog({ limit: 1000 });
       if (seq !== listRequestSeq.current) return null;
-      setData(next);
-      writeListSnapshot(next);
+      const serverIds = new Set((next.items || []).map((item) => item.id));
+      for (const id of serverIds) provisionalItemsRef.current.delete(id);
+      const pending = [...provisionalItemsRef.current.values()].filter((item) => !serverIds.has(item.id));
+      const reconciled = pending.length ? {
+        ...next,
+        total: n(next.total) + pending.length,
+        filtered: n(next.filtered) + pending.length,
+        items: [...pending, ...(next.items || [])],
+        tracking_summary: {
+          ...(next.tracking_summary || {}),
+          directions: n(next.tracking_summary?.directions) + pending.length,
+          tracking_enabled: n(next.tracking_summary?.tracking_enabled) + pending.length,
+        },
+      } : next;
+      setData(reconciled);
+      writeListSnapshot(reconciled);
       lastRefreshAtRef.current = Date.now();
       setError("");
       const current = selectedIdRef.current;
-      const items = next.items || [];
+      const items = reconciled.items || [];
       if (!current && items.length) setSelectedId(items[0].id);
       else if (current && !items.some((item) => item.id === current) && items.length) setSelectedId(items[0].id);
-      return next;
+      return reconciled;
     } catch (err) {
-      if (seq === listRequestSeq.current) setError(err instanceof Error ? err.message : String(err));
+      if (!silent && seq === listRequestSeq.current) setError(err instanceof Error ? err.message : String(err));
       return null;
     } finally {
       if (!silent && seq === listRequestSeq.current) setBusy("");
     }
   }, []);
 
-  const loadDetail = useCallback(async (itemId: string) => {
+  const loadDetail = useCallback(async (itemId: string, silent = false) => {
     if (!itemId) return null;
     const seq = ++detailRequestSeq.current;
     try {
@@ -368,7 +388,7 @@ export default function ResearchBacklog() {
       setError("");
       return item;
     } catch (err) {
-      if (seq === detailRequestSeq.current && selectedIdRef.current === itemId) setError(err instanceof Error ? err.message : String(err));
+      if (!silent && seq === detailRequestSeq.current && selectedIdRef.current === itemId) setError(err instanceof Error ? err.message : String(err));
       return null;
     }
   }, []);
@@ -409,6 +429,7 @@ export default function ResearchBacklog() {
       return;
     }
     setCopyState("idle");
+    setSelectedRun(null);
     const cached = readDetailSnapshot(selectedId);
     if (cached) setSelectedDetail(cached);
     else {
@@ -420,6 +441,41 @@ export default function ResearchBacklog() {
   // Selection is the only trigger. q/status changes must never refetch detail.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, loadDetail, loadRun]);
+
+  useEffect(() => {
+    if (!selectedId || !selectedRun || !ACTIVE_RUN_STATUSES.has(String(selectedRun.status || "").toUpperCase())) return;
+    const itemId = selectedId;
+    let disposed = false;
+    let timer: number | undefined;
+    let terminalRefreshStarted = false;
+    const schedule = () => {
+      if (disposed) return;
+      if (timer !== undefined) window.clearTimeout(timer);
+      timer = window.setTimeout(poll, document.visibilityState === "visible" ? 1000 : 4000);
+    };
+    const poll = async () => {
+      const latest = await loadRun(itemId);
+      if (disposed || selectedIdRef.current !== itemId) return;
+      const latestStatus = String(latest?.status || "").toUpperCase();
+      if (latest && TERMINAL_RUN_STATUSES.has(latestStatus)) {
+        if (!terminalRefreshStarted) {
+          terminalRefreshStarted = true;
+          void loadDetail(itemId, true);
+          void loadList(true);
+        }
+        return;
+      }
+      schedule();
+    };
+    const onVisibility = () => schedule();
+    document.addEventListener("visibilitychange", onVisibility);
+    schedule();
+    return () => {
+      disposed = true;
+      if (timer !== undefined) window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [selectedId, selectedRun, loadDetail, loadList, loadRun]);
 
   useEffect(() => {
     let timer: number | undefined;
@@ -467,7 +523,10 @@ export default function ResearchBacklog() {
   const automation = data.automation || {};
   const paused = Boolean(automation.paused_by_founder);
   const selected = selectedDetail || (data.items || []).find((item) => item.id === selectedId) || null;
-  const library: MaterialLibrary = selected?.material_library || {};
+  const currentRun = selectedRun && [selectedRun.item_key, selectedRun.item_id].filter(Boolean).includes(selectedId) ? selectedRun : null;
+  const currentRunStatus = String(currentRun?.status || "").toUpperCase();
+  const currentRunActive = ACTIVE_RUN_STATUSES.has(currentRunStatus);
+  const library: MaterialLibrary = useMemo(() => selected?.material_library || {}, [selected?.material_library]);
   const stats = selected?.material_stats || {};
 
   const allMaterials = useMemo(() => {
@@ -505,9 +564,18 @@ export default function ResearchBacklog() {
     if (!selectedId) return;
     setBusy("selected-refresh");
     try {
-      await runResearchBacklogItem(selectedId);
-      await loadRun(selectedId);
-      await loadList(true);
+      const result = await runResearchBacklogItem(selectedId);
+      setSelectedRun({
+        run_id: result.run_id,
+        item_id: result.item_id || selectedId,
+        item_key: result.item_key || result.item_id || selectedId,
+        status: result.research_run_status || (result.status === "STARTED" ? "QUEUED" : result.status) || "QUEUED",
+        duplicate_start_suppressed: result.duplicate_start_suppressed,
+        market_truth_writes: result.market_truth_writes,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+      setError("");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -517,15 +585,69 @@ export default function ResearchBacklog() {
 
   async function addIdea() {
     if (!newTitle.trim()) return;
+    const title = newTitle.trim();
+    const description = newDescription.trim() || title;
     setBusy("add");
     try {
-      const result = await addResearchBacklogIdeas([{ title: newTitle.trim(), description: newDescription.trim() || newTitle.trim(), source_kind: "USER_SUBMITTED" }]);
+      const result = await addResearchBacklogIdeas([{ title, description, source_kind: "USER_SUBMITTED" }]);
+      const addedId = result.added_ids?.[0];
+      const refreshedId = result.refreshed_ids?.[0];
+      const nextId = addedId || refreshedId;
+      if (addedId) {
+        const provisional: ResearchBacklogItem = {
+          id: addedId,
+          title,
+          description,
+          source_kind: "USER_SUBMITTED",
+          auto_status: "TRACKING_NEW",
+          tracking_enabled: true,
+          current_call: "等待首次研究",
+          why: "方向已加入，伺服器資料同步中。",
+          material_library: {},
+          material_stats: { total: 0, discussions: 0, products: 0, articles: 0, technical: 0, other: 0, new_total: 0, new_products: 0 },
+          research_count: 0,
+          tracking_cycle_count: 0,
+          new_material_count: 0,
+          new_product_count: 0,
+          has_new_data: false,
+          updated_at: new Date().toISOString(),
+        };
+        provisionalItemsRef.current.set(addedId, provisional);
+        setData((current) => {
+          if ((current.items || []).some((item) => item.id === addedId)) return current;
+          const next = {
+            ...current,
+            total: n(current.total) + 1,
+            filtered: n(current.filtered) + 1,
+            items: [provisional, ...(current.items || [])],
+            tracking_summary: {
+              ...(current.tracking_summary || {}),
+              directions: n(current.tracking_summary?.directions) + 1,
+              tracking_enabled: n(current.tracking_summary?.tracking_enabled) + 1,
+            },
+          };
+          writeListSnapshot(next);
+          return next;
+        });
+        selectedIdRef.current = addedId;
+        selectedDetailRef.current = provisional;
+        setSelectedDetail(provisional);
+        writeDetailSnapshot(provisional);
+      } else if (refreshedId) {
+        const existing = (data.items || []).find((item) => item.id === refreshedId) || readDetailSnapshot(refreshedId);
+        selectedIdRef.current = refreshedId;
+        if (existing) {
+          selectedDetailRef.current = existing;
+          setSelectedDetail(existing);
+        }
+      }
+      if (nextId) setSelectedId(nextId);
       setNewTitle("");
       setNewDescription("");
       setShowAdd(false);
-      const nextId = result.added_ids?.[0] || result.refreshed_ids?.[0];
-      await loadList(true);
-      if (nextId) setSelectedId(nextId);
+      setError("");
+      if (nextId) void loadDetail(nextId, true);
+      void loadList(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -577,7 +699,7 @@ export default function ResearchBacklog() {
           {showAdd ? (
             <div className="mt-5 grid gap-3 rounded-2xl border border-border-secondary bg-bg-secondary p-4 md:grid-cols-[1fr_1.6fr_auto]">
               <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="商機 / idea 標題" className="rounded-xl border border-border-secondary bg-bg-primary px-3 py-2.5 text-xs outline-none focus:border-info/50" />
-              <input value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="誰、什麼情境、遇到什麼問題（可以很短）" className="rounded-xl border border-border-secondary bg-bg-primary px-3 py-2.5 text-xs outline-none focus:border-info/50" />
+              <textarea value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="誰、什麼情境、遇到什麼問題（可以很短）" className="min-h-[120px] max-h-[360px] resize-y rounded-xl border border-border-secondary bg-bg-primary px-3 py-2.5 text-xs leading-5 outline-none focus:border-info/50" />
               <button type="button" disabled={!newTitle.trim() || busy === "add"} onClick={() => void addIdea()} className="rounded-xl bg-text-primary px-4 py-2.5 text-xs font-semibold text-bg-primary disabled:opacity-40">加入追蹤</button>
             </div>
           ) : null}
@@ -637,7 +759,7 @@ export default function ResearchBacklog() {
                 const meta = statusMeta(item.auto_status, item.has_new_data);
                 const itemStats = item.material_stats || {};
                 return (
-                  <button key={item.id} type="button" onClick={() => { setSelectedDetail(readDetailSnapshot(item.id) || item); setSelectedId(item.id); }} className={`w-full rounded-xl border p-2.5 text-left transition ${selectedId === item.id ? "border-info/40 bg-bg-info" : "border-border-secondary bg-bg-secondary/45 hover:bg-bg-secondary"}`}>
+                  <button key={item.id} type="button" onClick={() => { setSelectedRun(null); setSelectedDetail(readDetailSnapshot(item.id) || item); setSelectedId(item.id); }} className={`w-full rounded-xl border p-2.5 text-left transition ${selectedId === item.id ? "border-info/40 bg-bg-info" : "border-border-secondary bg-bg-secondary/45 hover:bg-bg-secondary"}`}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 line-clamp-2 text-[11px] font-semibold leading-4 text-text-primary">{item.title}</div>
                       <span className={`shrink-0 rounded-full border px-2 py-1 text-[9px] font-semibold ${meta.cls}`}>{meta.label}</span>
@@ -671,15 +793,15 @@ export default function ResearchBacklog() {
                       <p className="mt-1.5 max-w-4xl text-xs leading-5 text-text-secondary">{selected.description}</p>
                     </div>
                     <div className="flex shrink-0 flex-wrap gap-1.5">
-                      <button type="button" onClick={() => void runSelected()} disabled={busy === "selected-refresh" || ["QUEUED", "RUNNING", "RESUMING", "STOPPING"].includes(String(selectedRun?.status || "").toUpperCase())} className="inline-flex items-center gap-1.5 rounded-lg border border-border-secondary bg-bg-secondary px-3 py-2 text-[11px] font-semibold text-text-secondary disabled:opacity-50">
-                        {busy === "selected-refresh" || ["QUEUED", "RUNNING", "RESUMING", "STOPPING"].includes(String(selectedRun?.status || "").toUpperCase()) ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} 研究這一條
+                      <button type="button" onClick={() => void runSelected()} disabled={busy === "selected-refresh" || currentRunActive} className="inline-flex items-center gap-1.5 rounded-lg border border-border-secondary bg-bg-secondary px-3 py-2 text-[11px] font-semibold text-text-secondary disabled:opacity-50">
+                        {busy === "selected-refresh" || currentRunActive ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}{currentRunStatus === "QUEUED" || currentRunStatus === "RESUMING" ? " 已排隊" : currentRunStatus === "RUNNING" || currentRunStatus === "STOPPING" ? " 研究中" : " 研究這一條"}
                       </button>
                       <button type="button" onClick={() => void copyHandoff()} className="inline-flex items-center gap-1.5 rounded-lg bg-text-primary px-3 py-2 text-[11px] font-semibold text-bg-primary">
                         {copyState === "copied" ? <Check size={14} /> : <Copy size={14} />} {copyState === "copied" ? "已複製" : "給 ChatGPT"}
                       </button>
                     </div>
                   </div>
-                  <div className="mt-2 text-[10px] text-text-tertiary">單項研究：{runStatusLabel(selectedRun)}{selectedRun?.error ? ` · ${selectedRun.error}` : ""}</div>
+                  <div className="mt-2 text-[10px] text-text-tertiary">單項研究：{runStatusMessage(currentRun)}{currentRun?.error ? ` · ${currentRun.error}` : ""}</div>
 
                   <div className="mt-4 grid gap-2 grid-cols-2 md:grid-cols-4 2xl:grid-cols-7">
                     {[

@@ -245,6 +245,7 @@ export interface ResearchBacklogDetailResponse {
 
 export interface ResearchRun {
   run_id?: string;
+  item_id?: string;
   item_key?: string;
   status?: string;
   created_at?: string;
@@ -254,6 +255,35 @@ export interface ResearchRun {
   error?: string | null;
   duplicate_start_suppressed?: number;
   material_count?: number | null;
+  original_http_status?: number | null;
+  original_response?: {
+    status?: string;
+    id?: string;
+    materials_added?: number;
+    history_count?: number;
+    paused_before?: boolean;
+    paused_after?: boolean;
+    market_truth_writes?: number;
+    [key: string]: unknown;
+  } | null;
+  market_truth_writes?: number;
+}
+
+export interface ResearchRunStartResponse {
+  run_id?: string;
+  item_id?: string;
+  item_key?: string;
+  status?: string;
+  research_run_status?: string;
+  reason?: string;
+  started?: boolean;
+  worker_started?: boolean;
+  worker_running?: boolean;
+  running?: boolean;
+  accepted?: boolean;
+  duplicate_start_suppressed?: number;
+  status_url?: string;
+  research_continues_without_browser?: boolean;
   market_truth_writes?: number;
 }
 
@@ -315,18 +345,10 @@ export async function refreshResearchBacklogItem(itemId: string) {
 }
 
 export async function runResearchBacklogItem(itemId: string) {
-  return fetchJSON<{
-    run_id?: string;
-    item_id?: string;
-    item_key?: string;
-    status?: string;
-    research_run_status?: string;
-    reason?: string;
-    duplicate_start_suppressed?: number;
-    status_url?: string;
-    research_continues_without_browser?: boolean;
-    market_truth_writes?: number;
-  }>(`/signalforge/research-backlog/${encodeURIComponent(itemId)}/run`, { method: "POST" });
+  return fetchJSON<ResearchRunStartResponse>(
+    `/signalforge/research-backlog/${encodeURIComponent(itemId)}/run`,
+    { method: "POST" },
+  );
 }
 
 export async function getResearchBacklogRun(itemId: string) {
