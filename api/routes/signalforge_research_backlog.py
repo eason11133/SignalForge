@@ -1877,6 +1877,17 @@ async def research_backlog_refresh_item(item_id: str):
     return {**result, "auto_start": auto_start}
 
 
+@router.post("/research-backlog/{item_id}/run")
+async def research_backlog_run_item(item_id: str):
+    """Run one direction now without changing the global auto-tracking pause state."""
+    from processors.signalforge_research_backlog import run_single_item
+
+    result = await run_single_item(_REPO_ROOT, item_id, research_fn=_research_deterministic_batch)
+    if result.get("status") == "NOT_FOUND":
+        raise HTTPException(status_code=404, detail=f"research backlog item {item_id!r} not found")
+    return result
+
+
 @router.post("/research-backlog/{item_id}/handoff-copied")
 async def research_backlog_handoff_copied(item_id: str, payload: dict[str, Any] | None = None):
     """Acknowledge only after the UI successfully copied the exact handoff text."""

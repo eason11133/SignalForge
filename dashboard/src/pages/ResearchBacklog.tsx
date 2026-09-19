@@ -21,7 +21,8 @@ import {
   addResearchBacklogIdeas,
   getResearchBacklog,
   getResearchBacklogDetail,
-  refreshResearchBacklogItem,
+  getResearchBacklogRun,
+  runResearchBacklogItem,
   startResearchBacklog,
   stopResearchBacklog,
   type MaterialLibrary,
@@ -29,6 +30,7 @@ import {
   type ResearchBacklogItem,
   type ResearchBacklogResponse,
   type ResearchHistoryEntry,
+  type ResearchRun,
 } from "../api/researchBacklog";
 
 function n(value?: number) {
@@ -57,6 +59,16 @@ function statusMeta(status?: string, hasNewData = false) {
   if (raw === "TRACKING_DUE") return { label: "待更新", cls: "border-info/30 bg-bg-info text-info" };
   if (hasNewData) return { label: "有新資料", cls: "border-success/30 bg-bg-success text-txt-success" };
   return { label: "自動追蹤", cls: "border-success/30 bg-bg-success text-txt-success" };
+}
+
+function runStatusLabel(run?: ResearchRun | null) {
+  const status = String(run?.status || "").toUpperCase();
+  if (!status) return "未開始";
+  if (["QUEUED", "RESUMING"].includes(status)) return "排隊中";
+  if (["RUNNING", "STOPPING"].includes(status)) return "研究中";
+  if (status === "SUCCEEDED") return "完成";
+  if (["FAILED", "CANCELLED", "TIMED_OUT"].includes(status)) return "失敗";
+  return status;
 }
 
 function categoryLabel(category: string) {
@@ -298,6 +310,7 @@ export default function ResearchBacklog() {
   const [data, setData] = useState<ResearchBacklogResponse>(initialData);
   const [selectedId, setSelectedId] = useState(initialSelectedId);
   const [selectedDetail, setSelectedDetail] = useState<ResearchBacklogItem | null>(initialDetail);
+  const [selectedRun, setSelectedRun] = useState<ResearchRun | null>(null);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState("");
@@ -311,6 +324,7 @@ export default function ResearchBacklog() {
   const selectedDetailRef = useRef<ResearchBacklogItem | null>(selectedDetail);
   const listRequestSeq = useRef(0);
   const detailRequestSeq = useRef(0);
+  const runRequestSeq = useRef(0);
   const lastRefreshAtRef = useRef(0);
 
   useEffect(() => { selectedIdRef.current = selectedId; if (selectedId) writeSelectedId(selectedId); }, [selectedId]);
@@ -359,13 +373,29 @@ export default function ResearchBacklog() {
     }
   }, []);
 
+  const loadRun = useCallback(async (itemId: string) => {
+    if (!itemId) return null;
+    const seq = ++runRequestSeq.current;
+    try {
+      const result = await getResearchBacklogRun(itemId);
+      const run = result.run || null;
+      if (seq === runRequestSeq.current && selectedIdRef.current === itemId) setSelectedRun(run);
+      return run;
+    } catch {
+      if (seq === runRequestSeq.current && selectedIdRef.current === itemId) setSelectedRun(null);
+      return null;
+    }
+  }, []);
+
   const revalidateWorkspace = useCallback(async (explicit = false) => {
     const next = await loadList(!explicit);
     const itemId = selectedIdRef.current;
-    if (!next || !itemId) return;
+    if (!itemId) return;
+    void loadRun(itemId);
+    if (!next) return;
     const summaryItem = (next.items || []).find((item) => item.id === itemId);
     if (detailNeedsRefresh(summaryItem, selectedDetailRef.current)) void loadDetail(itemId);
-  }, [loadDetail, loadList]);
+  }, [loadDetail, loadList, loadRun]);
 
   useEffect(() => {
     // Stale-while-revalidate: cached list/detail render first; network freshness is background work.
@@ -375,6 +405,7 @@ export default function ResearchBacklog() {
   useEffect(() => {
     if (!selectedId) {
       setSelectedDetail(null);
+      setSelectedRun(null);
       return;
     }
     setCopyState("idle");
@@ -385,9 +416,10 @@ export default function ResearchBacklog() {
       setSelectedDetail(summaryItem);
     }
     void loadDetail(selectedId);
+    void loadRun(selectedId);
   // Selection is the only trigger. q/status changes must never refetch detail.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, loadDetail]);
+  }, [selectedId, loadDetail, loadRun]);
 
   useEffect(() => {
     let timer: number | undefined;
@@ -400,7 +432,8 @@ export default function ResearchBacklog() {
       clear();
       if (disposed || document.visibilityState !== "visible") return;
       const worker = data.worker || {};
-      const active = n(worker.active_count) > 0 || ["RUNNING", "SEARCHING"].includes(String(worker.status || "").toUpperCase());
+      const runActive = ["QUEUED", "RUNNING", "RESUMING", "STOPPING"].includes(String(selectedRun?.status || "").toUpperCase());
+      const active = runActive || n(worker.active_count) > 0 || ["RUNNING", "SEARCHING"].includes(String(worker.status || "").toUpperCase());
       timer = window.setTimeout(async () => {
         if (disposed || document.visibilityState !== "visible") return;
         await revalidateWorkspace(false);
@@ -422,7 +455,7 @@ export default function ResearchBacklog() {
       clear();
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [data.worker, revalidateWorkspace]);
+  }, [data.worker, selectedRun?.status, revalidateWorkspace]);
 
   const visibleItems = useMemo(
     () => (data.items || []).filter((item) => itemMatchesQuery(item, q) && itemMatchesStatus(item, status)),
@@ -468,13 +501,13 @@ export default function ResearchBacklog() {
     }
   }
 
-  async function refreshSelected() {
+  async function runSelected() {
     if (!selectedId) return;
     setBusy("selected-refresh");
     try {
-      await refreshResearchBacklogItem(selectedId);
+      await runResearchBacklogItem(selectedId);
+      await loadRun(selectedId);
       await loadList(true);
-      await loadDetail(selectedId);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -536,7 +569,7 @@ export default function ResearchBacklog() {
                 <Plus size={14} /> 加方向
               </button>
               <button type="button" onClick={() => void toggleTracking()} className="inline-flex items-center gap-1.5 rounded-lg bg-text-primary px-3 py-2 text-[11px] font-semibold text-bg-primary">
-                {paused ? <Play size={14} /> : <CirclePause size={14} />}{paused ? "開始追蹤" : "暫停追蹤"}
+                {paused ? <Play size={14} /> : <CirclePause size={14} />}全部方向自動追蹤：{paused ? "開始" : "暫停"}
               </button>
             </div>
           </div>
@@ -638,14 +671,15 @@ export default function ResearchBacklog() {
                       <p className="mt-1.5 max-w-4xl text-xs leading-5 text-text-secondary">{selected.description}</p>
                     </div>
                     <div className="flex shrink-0 flex-wrap gap-1.5">
-                      <button type="button" onClick={() => void refreshSelected()} disabled={busy === "selected-refresh"} className="inline-flex items-center gap-1.5 rounded-lg border border-border-secondary bg-bg-secondary px-3 py-2 text-[11px] font-semibold text-text-secondary disabled:opacity-50">
-                        {busy === "selected-refresh" ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} 立即追蹤
+                      <button type="button" onClick={() => void runSelected()} disabled={busy === "selected-refresh" || ["QUEUED", "RUNNING", "RESUMING", "STOPPING"].includes(String(selectedRun?.status || "").toUpperCase())} className="inline-flex items-center gap-1.5 rounded-lg border border-border-secondary bg-bg-secondary px-3 py-2 text-[11px] font-semibold text-text-secondary disabled:opacity-50">
+                        {busy === "selected-refresh" || ["QUEUED", "RUNNING", "RESUMING", "STOPPING"].includes(String(selectedRun?.status || "").toUpperCase()) ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} 研究這一條
                       </button>
                       <button type="button" onClick={() => void copyHandoff()} className="inline-flex items-center gap-1.5 rounded-lg bg-text-primary px-3 py-2 text-[11px] font-semibold text-bg-primary">
                         {copyState === "copied" ? <Check size={14} /> : <Copy size={14} />} {copyState === "copied" ? "已複製" : "給 ChatGPT"}
                       </button>
                     </div>
                   </div>
+                  <div className="mt-2 text-[10px] text-text-tertiary">單項研究：{runStatusLabel(selectedRun)}{selectedRun?.error ? ` · ${selectedRun.error}` : ""}</div>
 
                   <div className="mt-4 grid gap-2 grid-cols-2 md:grid-cols-4 2xl:grid-cols-7">
                     {[

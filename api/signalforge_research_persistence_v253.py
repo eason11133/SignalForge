@@ -11,6 +11,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional, Tuple
+from urllib.parse import unquote
 
 _VERSION = "2.5.3"
 _PROCESS_ID = uuid.uuid4().hex
@@ -342,6 +343,16 @@ class ResearchRunRegistry:
             return None
         return max(existing, key=lambda p: p.stat().st_mtime_ns)
 
+    def item_exists(self, item_key: str) -> bool:
+        path = self._choose_store()
+        if path is None:
+            return False
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            return False
+        return _find_item(data, item_key) is not None
+
     def _sample_store(self, run: Dict[str, Any]) -> Dict[str, Any]:
         path = self._choose_store()
         if path is None:
@@ -529,15 +540,18 @@ def _background_call(app, scope: Dict[str, Any], body: bytes, run_id: str) -> No
             )
             return
         async_started = _response_says_async_started(parsed)
-        _REGISTRY.update(
-            run_id,
-            status="RUNNING",
-            original_http_status=status,
-            original_response=parsed,
-            original_done=True,
-            original_done_at=_utcnow(),
-            original_async_started=async_started,
-        )
+        changes = {
+            "original_http_status": status,
+            "original_response": parsed,
+            "original_done": True,
+            "original_done_at": _utcnow(),
+            "original_async_started": async_started,
+        }
+        if str(scope.get("path") or "").endswith("/run"):
+            material_count = parsed.get("materials_added") if isinstance(parsed, dict) else None
+            _REGISTRY.finish(run_id, status="SUCCEEDED", material_count=material_count, **changes)
+        else:
+            _REGISTRY.update(run_id, status="RUNNING", **changes)
         if not async_started:
             # monitor still allows a short settle window so final store commit can become visible.
             pass
@@ -595,13 +609,20 @@ class SignalForgeResearchPersistenceMiddleware:
             await _json_response(send, {"version": _VERSION, "run": run, "market_truth_writes": 0}, 200 if run else 404)  # type: ignore[misc]
             return
 
-        if method == "POST" and path == f"{base}/start":
+        single_prefix = f"{base}/"
+        is_single_run = method == "POST" and path.startswith(single_prefix) and path.endswith("/run")
+        if method == "POST" and (path == f"{base}/start" or is_single_run):
             body = await _read_body(receive)
             try:
                 payload = json.loads(body.decode("utf-8")) if body else {}
             except Exception:
                 payload = {"_raw_sha256": hashlib.sha256(body).hexdigest()}
-            item_key = _find_id(payload) or ("payload-" + _stable_hash(payload)[:16] if payload else "__global__")
+            item_key = unquote(path[len(single_prefix):-len("/run")]).strip("/") if is_single_run else (
+                _find_id(payload) or ("payload-" + _stable_hash(payload)[:16] if payload else "__global__")
+            )
+            if is_single_run and (not item_key or "/" in item_key or not _REGISTRY.item_exists(item_key)):
+                await _json_response(send, {"detail": f"research backlog item {item_key!r} not found", "market_truth_writes": 0}, 404)  # type: ignore[misc]
+                return
             query = (scope.get("query_string") or b"").decode("utf-8", errors="ignore")
             force = (
                 headers.get("x-signalforge-force-research") == "1"

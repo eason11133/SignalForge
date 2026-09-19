@@ -34,6 +34,7 @@ TRUTH_BOUNDARY = (
 )
 
 _LOCK = threading.RLock()
+_SINGLE_ITEM_RUN_LOCK = threading.Lock()
 _SPACE_RE = re.compile(r"\s+")
 _WORD_RE = re.compile(r"[A-Za-z0-9\u4e00-\u9fff]+")
 
@@ -5461,6 +5462,105 @@ def request_tracking_refresh(repo: str | Path, item_id: str) -> dict[str, Any]:
     item["updated_at"] = _now()
     save_store(repo, store)
     return {"status": "TRACKING_REFRESH_REQUESTED", "id": item_id, "market_truth_writes": 0, "truth_boundary": TRUTH_BOUNDARY}
+
+
+async def run_single_item(
+    repo: str | Path,
+    item_id: str,
+    *,
+    research_fn: Callable[[str, str], Awaitable[Mapping[str, Any]]],
+) -> dict[str, Any]:
+    """Research exactly one direction without resuming or mutating global automation."""
+    repo = str(Path(repo).resolve())
+    await asyncio.to_thread(_SINGLE_ITEM_RUN_LOCK.acquire)
+    try:
+        store = load_store(repo, repair_worker=False)
+        item = (store.get("items") or {}).get(item_id) if isinstance(store.get("items"), Mapping) else None
+        if not isinstance(item, dict):
+            return {"status": "NOT_FOUND", "id": item_id, "market_truth_writes": 0, "truth_boundary": TRUTH_BOUNDARY}
+
+        paused_before = bool((store.get("automation") or {}).get("paused_by_founder", False))
+        started_at = _now()
+        item["auto_status"] = "SEARCHING"
+        item["current_call"] = "正在研究這一條"
+        item["why"] = "Founder requested research for this direction only; global auto tracking is unchanged."
+        item["latest_change"] = "SINGLE_ITEM_RESEARCH_STARTED"
+        item["updated_at"] = started_at
+        title, description = _job_prompt(item, "BASELINE")
+        save_store(repo, store)
+
+        result: Mapping[str, Any] | None = None
+        last_exc: Exception | None = None
+        for attempt in range(2):
+            try:
+                candidate = await research_fn(title, description)
+                if not isinstance(candidate, Mapping):
+                    raise RuntimeError("research_fn returned non-mapping result")
+                live_store = load_store(repo, repair_worker=False)
+                live_item = (live_store.get("items") or {}).get(item_id) or {}
+                result = _quality_filter_result(live_item, "BASELINE", candidate)
+                if not _research_transport_limited(result) or attempt >= 1:
+                    break
+                await asyncio.sleep(0.2 * (2 ** attempt))
+            except Exception as exc:
+                last_exc = exc
+                if attempt < 1:
+                    await asyncio.sleep(0.2 * (2 ** attempt))
+                    continue
+                break
+
+        store = load_store(repo, repair_worker=False)
+        item = (store.get("items") or {}).get(item_id) if isinstance(store.get("items"), Mapping) else None
+        if not isinstance(item, dict):
+            raise RuntimeError(f"research backlog item {item_id!r} disappeared during research")
+        paused_after = bool((store.get("automation") or {}).get("paused_by_founder", False))
+        completed_at = _now()
+        if result is None:
+            exc = last_exc or RuntimeError("single-item research failed without a result")
+            item["auto_status"] = "SOURCE_LIMITED"
+            item["current_call"] = "來源暫時受限"
+            item["why"] = f"單項研究來源失敗（已 bounded retry）：{type(exc).__name__}: {exc}"
+            item["latest_change"] = "SINGLE_ITEM_RESEARCH_FAILED"
+            item["updated_at"] = completed_at
+            save_store(repo, store)
+            raise RuntimeError(item["why"]) from exc
+
+        history = item.setdefault("history", [])
+        history.append(_history_snapshot("TRACK", result, started_at, completed_at))
+        while len(history) > 60:
+            del history[0]
+        added = _merge_material_result(item, result, completed_at)
+        item["tracking_cycle_count"] = int(item.get("tracking_cycle_count") or 0) + 1
+        item["tracking_source_expansion_version"] = _TRACKING_SOURCE_EXPANSION_VERSION
+        expansion_health = _tracking_expansion_health(item, result)
+        item["tracking_expansion_health"] = expansion_health
+        item["tracking_source_expansion_pending"] = not bool(expansion_health.get("complete"))
+        interval = max(3600, int((store.get("automation") or {}).get("tracking_interval_seconds") or _TRACKING_INTERVAL_SECONDS))
+        next_delay = interval if bool(expansion_health.get("complete")) else min(interval, 3600)
+        item["last_checked_at"] = completed_at
+        item["next_track_after"] = (datetime.now(timezone.utc) + timedelta(seconds=next_delay)).isoformat()
+        item["next_job"] = None
+        _clear_source_retry(item)
+        item["auto_status"] = "TRACKING" if bool(expansion_health.get("complete")) else "TRACKING_DUE"
+        item["current_call"] = "單項研究完成"
+        item["why"] = f"本輪新增 {int(added.get('total') or 0)} 筆相關資料；全域自動追蹤設定未變更。"
+        item["needs_founder"] = False
+        item["latest_change"] = "SINGLE_ITEM_RESEARCH_COMPLETED"
+        item["updated_at"] = completed_at
+        _refresh_accumulated_state(item)
+        save_store(repo, store)
+        return {
+            "status": "SINGLE_ITEM_RESEARCH_COMPLETED",
+            "id": item_id,
+            "materials_added": int(added.get("total") or 0),
+            "history_count": len(history),
+            "paused_before": paused_before,
+            "paused_after": paused_after,
+            "market_truth_writes": 0,
+            "truth_boundary": TRUTH_BOUNDARY,
+        }
+    finally:
+        _SINGLE_ITEM_RUN_LOCK.release()
 
 
 async def run_batch(

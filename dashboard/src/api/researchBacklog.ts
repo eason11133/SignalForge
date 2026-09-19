@@ -243,6 +243,20 @@ export interface ResearchBacklogDetailResponse {
   truth_boundary?: string;
 }
 
+export interface ResearchRun {
+  run_id?: string;
+  item_key?: string;
+  status?: string;
+  created_at?: string;
+  started_at?: string;
+  updated_at?: string;
+  finished_at?: string | null;
+  error?: string | null;
+  duplicate_start_suppressed?: number;
+  material_count?: number | null;
+  market_truth_writes?: number;
+}
+
 export async function getResearchBacklog(params?: { q?: string; status?: string; limit?: number }) {
   const query = new URLSearchParams();
   if (params?.q) query.set("q", params.q);
@@ -297,6 +311,27 @@ export async function refreshResearchBacklogItem(itemId: string) {
   return fetchJSON<{ status?: string; id?: string; auto_start?: { status?: string } }>(
     `/signalforge/research-backlog/${encodeURIComponent(itemId)}/refresh`,
     { method: "POST" },
+  );
+}
+
+export async function runResearchBacklogItem(itemId: string) {
+  return fetchJSON<{
+    run_id?: string;
+    item_id?: string;
+    item_key?: string;
+    status?: string;
+    research_run_status?: string;
+    reason?: string;
+    duplicate_start_suppressed?: number;
+    status_url?: string;
+    research_continues_without_browser?: boolean;
+    market_truth_writes?: number;
+  }>(`/signalforge/research-backlog/${encodeURIComponent(itemId)}/run`, { method: "POST" });
+}
+
+export async function getResearchBacklogRun(itemId: string) {
+  return fetchJSON<{ version?: string; run?: ResearchRun | null; market_truth_writes?: number }>(
+    `/signalforge/research-backlog/runs/${encodeURIComponent(itemId)}`,
   );
 }
 
