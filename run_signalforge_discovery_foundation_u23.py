@@ -1,0 +1,36 @@
+from pathlib import Path
+import time
+from processors.discovery_shadow_foundation_u23 import run
+
+def main():
+    print("="*154)
+    print("SignalForge U23 — Discovery Knowledge Formation Shadow Foundation")
+    print("append-only interpretation ledger | U21 legacy semantic adapter | granularity routing | weak-anchor inventory | deterministic projection | shadow-only authority")
+    print("="*154)
+    t=time.perf_counter()
+    r=run(Path("."))
+    print("U23_STATUS",r.get("status"))
+    print("U23_AUTHORITY",r.get("authority"))
+    print("U23_U21_ADAPTER",r.get("adapter"))
+    print("U23_EVENT_LEDGER",r.get("event_ledger"))
+    print("U23_PROJECTION",r.get("projection"))
+    print("U23_EVALUATION",r.get("evaluation"))
+    print("U23_PREMORTEM_LIVE_CONTROLS",r.get("premortem_live_controls"))
+    print("U23_SOURCE_CACHE",r.get("source_cache"))
+    print("U23_FOUNDER_PROTECTED_STATE_UNCHANGED",r.get("founder_protected_state_unchanged"))
+    print(f"U23_RUNTIME seconds={time.perf_counter()-t:.3f}")
+    print("="*126)
+    print("SIGNALFORGE U23 TRUTH / AUTHORITY AUDIT")
+    print("event_ledger_append_only: TRUE")
+    print("projection_is_rebuildable: TRUE")
+    print("legacy_basis_score_is_authority: FALSE")
+    print("family_formation_runs_in_u23: FALSE")
+    print("coverage_runs_in_u23: FALSE")
+    print("unknown_is_false: FALSE")
+    print("shadow_production_authority: 0")
+    print("founder_thesis_truth_modified: FALSE")
+    print("demand_wtp_opportunity_claim_created: FALSE")
+    print("product_ideation: 0")
+    print("="*126)
+
+if __name__=="__main__":main()

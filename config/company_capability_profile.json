@@ -1,0 +1,101 @@
+{
+  "version": "company-reality-v2-founder-addressability",
+  "purpose": "Persistent baseline for future Company Reality / Execution Gate. Only proven or explicitly known capabilities are marked strong. Unknowns stay unknown.",
+  "strengths": [
+    {
+      "capability": "AI/API integration",
+      "level": "strong",
+      "evidence": "Multiple active software projects use LLM/API integrations."
+    },
+    {
+      "capability": "Python backend development",
+      "level": "strong",
+      "evidence": "FastAPI/Flask and data-processing systems have been implemented in active projects."
+    },
+    {
+      "capability": "Web product prototyping",
+      "level": "strong",
+      "evidence": "React/Vite dashboards and product interfaces are actively built."
+    },
+    {
+      "capability": "Data scraping and evidence pipelines",
+      "level": "strong",
+      "evidence": "Current Radar already ingests and processes multiple external data sources."
+    },
+    {
+      "capability": "Rapid AI-assisted MVP implementation",
+      "level": "strong",
+      "evidence": "Current workflow can move from specification to working software quickly with AI coding support."
+    }
+  ],
+  "known_gaps": [
+    {
+      "capability": "Deep specialist domain expertise",
+      "level": "unknown_or_low_by_default",
+      "rule": "Do not assume specialist expertise unless there is explicit evidence for that opportunity."
+    },
+    {
+      "capability": "Enterprise sales and procurement",
+      "level": "unknown",
+      "rule": "Treat enterprise distribution as unproven until real customer access evidence exists."
+    },
+    {
+      "capability": "Regulated-industry compliance",
+      "level": "low_by_default",
+      "rule": "Healthcare, finance, critical infrastructure, legal/compliance-heavy opportunities require explicit expert and regulatory evidence."
+    }
+  ],
+  "execution_policy": {
+    "prefer_fast_validation": true,
+    "short_validation_window_is_better": true,
+    "long_builds_require_durability_evidence": true,
+    "customer_satisfaction_matters_more_than_demo_completion": true,
+    "missing_capability_is_not_always_a_blocker": "Classify as CAN_DO, CAN_ACQUIRE, or HARD_BLOCKER.",
+    "do_not_assume_distribution": true,
+    "do_not_assume_willingness_to_pay": true
+  },
+  "notes": [
+    "This is a starting profile, not a permanent truth.",
+    "Future evidence should update capabilities rather than letting an LLM improvise them per opportunity.",
+    "A problem can be real and valuable while still being a bad fit for the current company."
+  ],
+  "strategic_search_policy": {
+    "primary_long_term_objective": "EASON_ADDRESSABLE_ZIP2_STRUCTURAL",
+    "secondary_short_term_objective": "EASON_ADDRESSABLE_FAST_VALIDATION",
+    "highest_priority_overlap": "BOTH",
+    "valid_empty_result": true,
+    "ai_boundary": "AI may increase execution capacity but cannot prove domain knowledge, buyer access, legitimacy, trust, regulation, or willingness-to-pay."
+  },
+  "domain_adjacency_policy": {
+    "core_or_adjacent_from_existing_evidence": [
+      "AI/LLM software workflows",
+      "Python/web software products",
+      "data/evidence/research pipelines",
+      "rapid AI-assisted MVP implementation"
+    ],
+    "unknown_by_default": [
+      "deep specialist industry workflow knowledge",
+      "enterprise procurement access",
+      "regulated-industry domain authority"
+    ],
+    "rule": "A market can be objectively attractive while being NOT EASON-ADDRESSABLE NOW. Do not downgrade objective market truth; gate only first-person Founder action."
+  },
+  "credibility_policy": {
+    "owned": "Only explicit prior work, artifacts, customers, or demonstrated workflow experience.",
+    "borrowable": "A named expert/partner/customer co-design relationship may reduce a credibility gap only when explicit evidence exists.",
+    "buildable": "Low-trust self-serve markets may build legitimacy through a bounded product + user proof; do not assume this in enterprise or regulated markets.",
+    "non_bridgeable_now": "Extreme trust/regulatory burden without explicit expert/partner evidence blocks Founder action."
+  },
+  "research_to_action_policy": {
+    "rule": "When core problem + buyer + durable gap are supported and remaining uncertainty is best reduced by real buyer behavior, market action may outrank more desk research.",
+    "market_actions": [
+      "buyer_interview",
+      "bounded_outreach",
+      "landing_page_test",
+      "prototype_test",
+      "paid_pilot",
+      "preorder"
+    ],
+    "authority": "Planning only; only observed outcomes may update calibration."
+  }
+}

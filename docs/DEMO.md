@@ -4,8 +4,8 @@
 
 1. 從 [README](../README.md) 的定位與核心流程開始。
 2. 閱讀 [Architecture](ARCHITECTURE.md) 的 run lifecycle 與 failure semantics。
-3. 查看 `src/api/signalforge_research_persistence.py`，確認 `run_id`、idempotency 與持久化不是只有概念。
-4. 查看 `src/processors/signalforge_founder_idea_loop.py` 與 `signalforge_research_backlog.py`，搜尋 `relevance`、`dedup`、`first_seen`、`seen_count`。
+3. 查看 `api/signalforge_research_persistence_v253.py`，確認 `run_id`、idempotency 與持久化不是只有概念。
+4. 查看 `processors/signalforge_founder_idea_loop.py` 與 `processors/signalforge_research_backlog.py`，搜尋 `relevance`、`dedup`、`first_seen`、`seen_count`。
 5. 執行兩個不需真實 credential 的代表性測試。
 
 ## Persistence demo
@@ -13,7 +13,7 @@
 在 repository root 執行：
 
 ```bash
-python tests/research_persistence_smoke.py
+python run_signalforge_tracking_research_persistence_v2_5_3_smoke.py
 ```
 
 測試會使用 temporary directory，不讀寫 production runtime。預期驗證：
@@ -28,7 +28,7 @@ python tests/research_persistence_smoke.py
 ## Relevance regression demo
 
 ```bash
-python tests/research_relevance_regression.py
+python run_signalforge_r8_idea_research_recall_fix5_acceptance.py
 ```
 
 此測試使用固定 fixture 與假的 transport，不呼叫外部網路。它檢查：
@@ -52,4 +52,3 @@ python tests/research_relevance_regression.py
 ## Demo 的誠實邊界
 
 此案例只展示研究 pipeline 與資料可信度設計。它不證明該 hypothesis 已有市場、有人願意付費，或 SignalForge 能預測商業成功。
-

@@ -1,0 +1,699 @@
+{
+  "benchmark_id": "signalforge-benchmark-batch-01",
+  "version": "2026-09-07-v1",
+  "purpose": "Founder Observation Quality + cross-market source/relevance benchmark. Synthetic hypotheses are test inputs only and have zero market-truth authority.",
+  "execution_policy": {
+    "run_now_sets": [
+      "GOLDEN",
+      "TOURNAMENT_MAIN"
+    ],
+    "holdout_set": "HOLDOUT",
+    "holdout_rule": "Do not use HOLDOUT cases to tune relevance/routing before the first holdout run.",
+    "market_truth_writes": 0,
+    "notes": [
+      "GOLDEN cases have manual relevance expectations.",
+      "TOURNAMENT_MAIN cases come from prior AI opportunity tournaments and remain synthetic/unvalidated.",
+      "HOLDOUT exists to detect overfitting after quality repair."
+    ]
+  },
+  "counts": {
+    "total": 36,
+    "golden": 12,
+    "tournament_main": 16,
+    "holdout": 8,
+    "run_now": 28
+  },
+  "records": [
+    {
+      "id": "G01",
+      "set": "GOLDEN",
+      "run_policy": "RUN_NOW",
+      "category": "developer",
+      "title": "AI coding agents finish work but founders cannot efficiently verify whether the work is actually correct and complete",
+      "description": "Founders using Claude Code, Codex or similar coding agents need to verify requirements, tests, correctness and actual completion without manually reviewing everything.",
+      "provenance": {
+        "type": "FOUNDER_GOLDEN",
+        "source": "current SignalForge live-probe discussion"
+      },
+      "annotation": {
+        "status": "MANUALLY_DEFINED",
+        "exact_relevance": "Completion verification, requirement adherence, tests/acceptance evidence, human review burden, claimed completion vs actual result.",
+        "adjacent_not_exact": "General AI coding complaints, agent orchestration, productivity, coding experience.",
+        "known_negative_examples": [
+          "AI coding made me faster, but I can't code to music anymore",
+          "Spit Notes – lyrics and voice memos"
+        ],
+        "known_positive_example": "AI cannot always be trusted to understand changed functionality or requirements, so human review remains useful or essential."
+      }
+    },
+    {
+      "id": "G02",
+      "set": "GOLDEN",
+      "run_policy": "RUN_NOW",
+      "category": "developer",
+      "title": "Multiple coding agents working in parallel create coordination and collision problems",
+      "description": "Developers running multiple coding agents in parallel struggle with branch/worktree collisions, overlapping edits, coordination and knowing which agent owns which task.",
+      "provenance": {
+        "type": "FOUNDER_GOLDEN",
+        "source": "benchmark design in current project discussion"
+      },
+      "annotation": {
+        "status": "MANUALLY_DEFINED"
+      }
+    },
+    {
+      "id": "G03",
+      "set": "GOLDEN",
+      "run_policy": "RUN_NOW",
+      "category": "developer",
+      "title": "Developers lose understanding and ownership of codebases after AI generates too much code",
+      "description": "AI-assisted development can create code faster than developers can understand it, increasing maintenance, debugging and ownership burden.",
+      "provenance": {
+        "type": "FOUNDER_GOLDEN",
+        "source": "benchmark design in current project discussion"
+      },
+      "annotation": {
+        "status": "MANUALLY_DEFINED"
+      }
+    },
+    {
+      "id": "G04",
+      "set": "GOLDEN",
+      "run_policy": "RUN_NOW",
+      "category": "education",
+      "title": "Taiwan high-school students know vocabulary and grammar but still struggle to produce English writing and translation",
+      "description": "Students can recognize language knowledge but cannot reliably produce correct English in composition and Chinese-to-English translation.",
+      "provenance": {
+        "type": "FOUNDER_GOLDEN",
+        "source": "benchmark design in current project discussion"
+      },
+      "annotation": {
+        "status": "MANUALLY_DEFINED"
+      }
+    },
+    {
+      "id": "G05",
+      "set": "GOLDEN",
+      "run_policy": "RUN_NOW",
+      "category": "education",
+      "title": "Students memorize vocabulary but still fail to recognize, retain or use words in exams",
+      "description": "Vocabulary study does not reliably transfer into recognition, multiple-meaning recall, collocation use and productive use under exam conditions.",
+      "provenance": {
+        "type": "FOUNDER_GOLDEN",
+        "source": "benchmark design in current project discussion"
+      },
+      "annotation": {
+        "status": "MANUALLY_DEFINED"
+      }
+    },
+    {
+      "id": "G06",
+      "set": "GOLDEN",
+      "run_policy": "RUN_NOW",
+      "category": "smb",
+      "title": "Small service businesses spend too much time manually answering repeated inquiries, bookings and quote requests",
+      "description": "Small service businesses repeatedly answer the same questions, handle booking coordination and prepare similar quotes through manual messaging.",
+      "provenance": {
+        "type": "FOUNDER_GOLDEN",
+        "source": "benchmark design in current project discussion"
+      },
+      "annotation": {
+        "status": "MANUALLY_DEFINED"
+      }
+    },
+    {
+      "id": "G07",
+      "set": "GOLDEN",
+      "run_policy": "RUN_NOW",
+      "category": "smb",
+      "title": "Small businesses lose potential customers because inquiries are missed or answered too slowly",
+      "description": "Inbound customer messages are missed, delayed or forgotten, causing lost leads or lower conversion.",
+      "provenance": {
+        "type": "FOUNDER_GOLDEN",
+        "source": "benchmark design in current project discussion"
+      },
+      "annotation": {
+        "status": "MANUALLY_DEFINED"
+      }
+    },
+    {
+      "id": "G08",
+      "set": "GOLDEN",
+      "run_policy": "RUN_NOW",
+      "category": "agency",
+      "title": "Agencies spend excessive time manually assembling multi-platform client performance reports",
+      "description": "Agency teams repeatedly collect metrics from multiple tools and turn them into client-facing reports by hand.",
+      "provenance": {
+        "type": "FOUNDER_GOLDEN",
+        "source": "benchmark design in current project discussion"
+      },
+      "annotation": {
+        "status": "MANUALLY_DEFINED"
+      }
+    },
+    {
+      "id": "G09",
+      "set": "GOLDEN",
+      "run_policy": "RUN_NOW",
+      "category": "ecommerce",
+      "title": "E-commerce support teams spend large amounts of time on repetitive order-status, returns and shipping questions",
+      "description": "Customer support repeatedly handles where-is-my-order, return, refund and logistics questions that consume staff time.",
+      "provenance": {
+        "type": "FOUNDER_GOLDEN",
+        "source": "benchmark design in current project discussion"
+      },
+      "annotation": {
+        "status": "MANUALLY_DEFINED"
+      }
+    },
+    {
+      "id": "G10",
+      "set": "GOLDEN",
+      "run_policy": "RUN_NOW",
+      "category": "creator",
+      "title": "Creators manually repurpose one long piece of content into many platform-specific short formats",
+      "description": "Creators repeatedly cut, rewrite, resize and repackage long-form content for multiple social platforms.",
+      "provenance": {
+        "type": "FOUNDER_GOLDEN",
+        "source": "benchmark design in current project discussion"
+      },
+      "annotation": {
+        "status": "MANUALLY_DEFINED"
+      }
+    },
+    {
+      "id": "G11",
+      "set": "GOLDEN",
+      "run_policy": "RUN_NOW",
+      "category": "nonprofit",
+      "title": "Nonprofits handling public inquiries through LINE face repetitive questions, triage and handoff burden",
+      "description": "NGOs receive many LINE inquiries that require repetitive answers, case triage and manual handoff across staff.",
+      "provenance": {
+        "type": "FOUNDER_GOLDEN",
+        "source": "benchmark design in current project discussion"
+      },
+      "annotation": {
+        "status": "MANUALLY_DEFINED"
+      }
+    },
+    {
+      "id": "G12",
+      "set": "GOLDEN",
+      "run_policy": "RUN_NOW",
+      "category": "b2b_saas",
+      "title": "Small B2B SaaS teams repeatedly answer enterprise security questionnaires during procurement",
+      "description": "Enterprise deals force small software teams to repeatedly complete similar security and vendor questionnaires before purchase approval.",
+      "provenance": {
+        "type": "FOUNDER_GOLDEN",
+        "source": "benchmark design in current project discussion"
+      },
+      "annotation": {
+        "status": "MANUALLY_DEFINED"
+      }
+    },
+    {
+      "id": "T01",
+      "set": "TOURNAMENT_MAIN",
+      "run_policy": "RUN_NOW",
+      "category": "industrial_energy",
+      "title": "Compressed-Air Leak Detection / Recovery",
+      "description": "SME factories with pneumatic equipment may waste electricity through compressed-air leaks; the customer buys identification of where money is leaking and what to fix.",
+      "provenance": {
+        "type": "MODEL_HYPOTHESIS",
+        "source_ai": [
+          "Claude"
+        ],
+        "meeting": "#004",
+        "source_rank": "Claude #1",
+        "collision_id": "N01"
+      },
+      "annotation": {
+        "status": "UNLABELED",
+        "stress_question": "Is this a recurring market pain or merely a one-off on-site service?"
+      }
+    },
+    {
+      "id": "T02",
+      "set": "TOURNAMENT_MAIN",
+      "run_policy": "RUN_NOW",
+      "category": "manufacturing",
+      "title": "PCBA First-Article Inspection Acceleration",
+      "description": "EMS/PCBA QA teams may face first-article inspection bottlenecks after SMT line changes; the hypothesis is that faster BOM/placement/visual verification can reduce release delay.",
+      "provenance": {
+        "type": "MODEL_HYPOTHESIS",
+        "source_ai": [
+          "Gemini"
+        ],
+        "meeting": "#004",
+        "source_rank": "Gemini #5",
+        "collision_id": "N02"
+      },
+      "annotation": {
+        "status": "UNLABELED",
+        "stress_question": "Do existing AOI/SPI/FAI systems already solve the economically important gap?"
+      }
+    },
+    {
+      "id": "T03",
+      "set": "TOURNAMENT_MAIN",
+      "run_policy": "RUN_NOW",
+      "category": "manufacturing",
+      "title": "Machine Downtime Log Intelligence",
+      "description": "Production managers may have machine fault and downtime logs but still struggle to identify which recurring causes produce the largest real output loss.",
+      "provenance": {
+        "type": "MODEL_HYPOTHESIS",
+        "source_ai": [
+          "Claude"
+        ],
+        "meeting": "#004",
+        "source_rank": "Claude #8",
+        "collision_id": "N03"
+      },
+      "annotation": {
+        "status": "UNLABELED",
+        "stress_question": "Does the analysis reveal new actionable learning or merely restate what operators already know?"
+      }
+    },
+    {
+      "id": "T04",
+      "set": "TOURNAMENT_MAIN",
+      "run_policy": "RUN_NOW",
+      "category": "industrial_marketplace",
+      "title": "Scrap / Byproduct Competitive Bidding",
+      "description": "Factories that repeatedly sell metal scrap or production byproducts may accept fixed recycler pricing; competitive bids could expose price uplift and create a recurring transaction network.",
+      "provenance": {
+        "type": "MODEL_HYPOTHESIS",
+        "source_ai": [
+          "Claude"
+        ],
+        "meeting": "#004",
+        "source_rank": "Claude #4",
+        "collision_id": "N04"
+      },
+      "annotation": {
+        "status": "UNLABELED",
+        "stress_question": "Are price spreads meaningful after logistics, relationships and settlement terms?"
+      }
+    },
+    {
+      "id": "T05",
+      "set": "TOURNAMENT_MAIN",
+      "run_policy": "RUN_NOW",
+      "category": "procurement",
+      "title": "Raw-Material Group Purchasing",
+      "description": "Small manufacturers with insufficient individual order volume may combine recurring purchases to reach supplier bulk-price tiers.",
+      "provenance": {
+        "type": "MODEL_HYPOTHESIS",
+        "source_ai": [
+          "Claude"
+        ],
+        "meeting": "#004",
+        "source_rank": "Claude #5",
+        "collision_id": "N05"
+      },
+      "annotation": {
+        "status": "UNLABELED",
+        "stress_question": "Do timing, specifications, delivery, credit and MOQ coordination destroy the economics?"
+      }
+    },
+    {
+      "id": "T06",
+      "set": "TOURNAMENT_MAIN",
+      "run_policy": "RUN_NOW",
+      "category": "solar",
+      "title": "Solar Warranty Recovery / Inspection Targeting",
+      "description": "Solar asset owners may need to identify financially meaningful underperformance before warranty or defect-liability deadlines and target physical inspection where evidence is most valuable.",
+      "provenance": {
+        "type": "MODEL_HYPOTHESIS",
+        "source_ai": [
+          "Gemini"
+        ],
+        "meeting": "#004",
+        "source_rank": "Gemini #1",
+        "collision_id": "N06"
+      },
+      "annotation": {
+        "status": "UNLABELED",
+        "stress_question": "What evidence do OEMs actually accept, and how much value can software add before physical testing is required?"
+      }
+    },
+    {
+      "id": "T07",
+      "set": "TOURNAMENT_MAIN",
+      "run_policy": "RUN_NOW",
+      "category": "construction",
+      "title": "Construction Claim / Change-Order Evidence",
+      "description": "Contractors may struggle to prove extra work, timing, instructions and approvals in change-order disputes, delaying or reducing payment.",
+      "provenance": {
+        "type": "MULTI_MODEL_CONVERGENCE",
+        "source_ai": [
+          "Perplexity",
+          "Gemini"
+        ],
+        "meeting": "#004",
+        "source_rank": "Perplexity #1/#9 + Gemini #2",
+        "collision_id": "N07"
+      },
+      "annotation": {
+        "status": "UNLABELED",
+        "stress_question": "Does better evidence materially change claim approval and payment outcomes?"
+      }
+    },
+    {
+      "id": "T08",
+      "set": "TOURNAMENT_MAIN",
+      "run_policy": "RUN_NOW",
+      "category": "industrial_energy",
+      "title": "Industrial Tariff / Contract-Capacity Correction",
+      "description": "SME factories may incur avoidable electricity cost from contract-capacity choices, tariff structure, peak demand or power-factor issues.",
+      "provenance": {
+        "type": "MULTI_MODEL_CONVERGENCE",
+        "source_ai": [
+          "Gemini",
+          "Claude",
+          "Perplexity"
+        ],
+        "meeting": "#004",
+        "source_rank": "Gemini #3 + Claude #2 + Perplexity #4",
+        "collision_id": "N08"
+      },
+      "annotation": {
+        "status": "UNLABELED",
+        "stress_question": "Is the recoverable value large and repeatable enough, or is this a small one-time correction service?"
+      }
+    },
+    {
+      "id": "T09",
+      "set": "TOURNAMENT_MAIN",
+      "run_policy": "RUN_NOW",
+      "category": "mro",
+      "title": "Industrial Spare-Part Intelligence",
+      "description": "Factories may lose downtime because parts are difficult to identify and source across messy names, partial numbers, old manuals, internal inventory and fragmented suppliers.",
+      "provenance": {
+        "type": "MULTI_MODEL_TOURNAMENT_FINALIST",
+        "source_ai": [
+          "Gemini",
+          "Perplexity",
+          "Claude",
+          "Captain"
+        ],
+        "meeting": "#003",
+        "finalist_id": "F04"
+      },
+      "annotation": {
+        "status": "UNLABELED"
+      }
+    },
+    {
+      "id": "T10",
+      "set": "TOURNAMENT_MAIN",
+      "run_policy": "RUN_NOW",
+      "category": "automotive",
+      "title": "Used EV Battery Health / Residual Value",
+      "description": "Used-EV markets may lack a trusted independent battery-condition layer that can influence pricing, buying, warranty, finance or residual-value decisions.",
+      "provenance": {
+        "type": "MULTI_MODEL_TOURNAMENT_FINALIST",
+        "source_ai": [
+          "Gemini",
+          "Perplexity",
+          "Claude",
+          "Captain"
+        ],
+        "meeting": "#003",
+        "finalist_id": "F05"
+      },
+      "annotation": {
+        "status": "UNLABELED"
+      }
+    },
+    {
+      "id": "T11",
+      "set": "TOURNAMENT_MAIN",
+      "run_policy": "RUN_NOW",
+      "category": "industrial_resale",
+      "title": "Used Industrial Equipment Condition Passport",
+      "description": "Condition uncertainty in used industrial machinery may suppress trust, pricing accuracy and transaction liquidity.",
+      "provenance": {
+        "type": "MULTI_MODEL_TOURNAMENT_FINALIST",
+        "source_ai": [
+          "Gemini",
+          "Perplexity",
+          "Claude",
+          "Captain"
+        ],
+        "meeting": "#003",
+        "finalist_id": "F06"
+      },
+      "annotation": {
+        "status": "UNLABELED"
+      }
+    },
+    {
+      "id": "T12",
+      "set": "TOURNAMENT_MAIN",
+      "run_policy": "RUN_NOW",
+      "category": "manufacturing",
+      "title": "CNC Thermal Drift Compensation",
+      "description": "CNC operations may lose machine time or create scrap because thermal drift requires warm-up, measurement or compensation.",
+      "provenance": {
+        "type": "MODEL_HYPOTHESIS",
+        "source_ai": [
+          "Gemini"
+        ],
+        "meeting": "#004",
+        "source_rank": "Gemini #10"
+      },
+      "annotation": {
+        "status": "UNLABELED"
+      }
+    },
+    {
+      "id": "T13",
+      "set": "TOURNAMENT_MAIN",
+      "run_policy": "RUN_NOW",
+      "category": "building_operations",
+      "title": "Commercial HVAC Efficiency Audit",
+      "description": "Commercial buildings may incur avoidable HVAC energy cost that is difficult to isolate and act on with current routines.",
+      "provenance": {
+        "type": "MODEL_HYPOTHESIS",
+        "source_ai": [
+          "Gemini"
+        ],
+        "meeting": "#004",
+        "source_rank": "Gemini #8"
+      },
+      "annotation": {
+        "status": "UNLABELED"
+      }
+    },
+    {
+      "id": "T14",
+      "set": "TOURNAMENT_MAIN",
+      "run_policy": "RUN_NOW",
+      "category": "industrial_process",
+      "title": "Wastewater Dosing Optimization",
+      "description": "Industrial wastewater treatment may overuse chemicals or operate inefficiently because dosing decisions are not well optimized.",
+      "provenance": {
+        "type": "MODEL_HYPOTHESIS",
+        "source_ai": [
+          "Gemini"
+        ],
+        "meeting": "#004",
+        "source_rank": "Gemini #9"
+      },
+      "annotation": {
+        "status": "UNLABELED"
+      }
+    },
+    {
+      "id": "T15",
+      "set": "TOURNAMENT_MAIN",
+      "run_policy": "RUN_NOW",
+      "category": "ecommerce_finance",
+      "title": "E-commerce Marketplace Payout Audit",
+      "description": "Sellers may lose money through payout discrepancies, fees, deductions or reconciliation errors across e-commerce marketplaces.",
+      "provenance": {
+        "type": "MODEL_HYPOTHESIS",
+        "source_ai": [
+          "Claude"
+        ],
+        "meeting": "#004",
+        "source_rank": "Claude #6"
+      },
+      "annotation": {
+        "status": "UNLABELED"
+      }
+    },
+    {
+      "id": "T16",
+      "set": "TOURNAMENT_MAIN",
+      "run_policy": "RUN_NOW",
+      "category": "logistics",
+      "title": "Freight / Cargo Claim Recovery",
+      "description": "Shippers may fail to recover money from freight damage or cargo claims because evidence, filing and recovery workflows are fragmented or burdensome.",
+      "provenance": {
+        "type": "MODEL_HYPOTHESIS",
+        "source_ai": [
+          "Claude"
+        ],
+        "meeting": "#004",
+        "source_rank": "Claude #9"
+      },
+      "annotation": {
+        "status": "UNLABELED"
+      }
+    },
+    {
+      "id": "H01",
+      "set": "HOLDOUT",
+      "run_policy": "DO_NOT_TUNE_ON",
+      "category": "care_tech",
+      "title": "Connected Care Device Infrastructure",
+      "description": "Legacy tournament candidate concerning software, connectivity and device infrastructure for care settings.",
+      "provenance": {
+        "type": "LEGACY_TOURNAMENT_CANDIDATE",
+        "source_ai": [
+          "Research Team"
+        ],
+        "meeting": "#002",
+        "legacy_id": "D"
+      },
+      "annotation": {
+        "status": "HOLDOUT_UNLABELED"
+      }
+    },
+    {
+      "id": "H02",
+      "set": "HOLDOUT",
+      "run_policy": "DO_NOT_TUNE_ON",
+      "category": "manufacturing",
+      "title": "Smart Mold / Tooling Intelligence",
+      "description": "Legacy tournament candidate concerning tooling or mold intelligence in manufacturing workflows.",
+      "provenance": {
+        "type": "LEGACY_TOURNAMENT_CANDIDATE",
+        "source_ai": [
+          "Research Team"
+        ],
+        "meeting": "#002",
+        "legacy_id": "A"
+      },
+      "annotation": {
+        "status": "HOLDOUT_UNLABELED"
+      }
+    },
+    {
+      "id": "H03",
+      "set": "HOLDOUT",
+      "run_policy": "DO_NOT_TUNE_ON",
+      "category": "logistics",
+      "title": "Freight Intelligence",
+      "description": "Legacy tournament candidate concerning freight operations and decision support.",
+      "provenance": {
+        "type": "LEGACY_TOURNAMENT_CANDIDATE",
+        "source_ai": [
+          "Research Team"
+        ],
+        "meeting": "#002",
+        "legacy_id": "B"
+      },
+      "annotation": {
+        "status": "HOLDOUT_UNLABELED"
+      }
+    },
+    {
+      "id": "H04",
+      "set": "HOLDOUT",
+      "run_policy": "DO_NOT_TUNE_ON",
+      "category": "infrastructure",
+      "title": "Private Drainage Intelligence",
+      "description": "Legacy tournament candidate concerning private drainage inspection, risk or infrastructure intelligence.",
+      "provenance": {
+        "type": "LEGACY_TOURNAMENT_CANDIDATE",
+        "source_ai": [
+          "Research Team"
+        ],
+        "meeting": "#002",
+        "legacy_id": "E"
+      },
+      "annotation": {
+        "status": "HOLDOUT_UNLABELED"
+      }
+    },
+    {
+      "id": "H05",
+      "set": "HOLDOUT",
+      "run_policy": "DO_NOT_TUNE_ON",
+      "category": "food_service",
+      "title": "Kitchen Risk",
+      "description": "Legacy tournament candidate concerning kitchen operational risk.",
+      "provenance": {
+        "type": "LEGACY_TOURNAMENT_CANDIDATE",
+        "source_ai": [
+          "Research Team"
+        ],
+        "meeting": "#002",
+        "legacy_id": "C"
+      },
+      "annotation": {
+        "status": "HOLDOUT_UNLABELED"
+      }
+    },
+    {
+      "id": "H06",
+      "set": "HOLDOUT",
+      "run_policy": "DO_NOT_TUNE_ON",
+      "category": "cold_chain",
+      "title": "Cold-Chain Insurance Evidence",
+      "description": "Hypothesis that cold-chain operators may need better operational evidence to support insurance or loss claims.",
+      "provenance": {
+        "type": "MODEL_HYPOTHESIS",
+        "source_ai": [
+          "Gemini"
+        ],
+        "meeting": "#004",
+        "source_rank": "Gemini #6"
+      },
+      "annotation": {
+        "status": "HOLDOUT_UNLABELED"
+      }
+    },
+    {
+      "id": "H07",
+      "set": "HOLDOUT",
+      "run_policy": "DO_NOT_TUNE_ON",
+      "category": "customs",
+      "title": "HS Code / Customs Duty Audit",
+      "description": "Hypothesis that importers may lose money through tariff classification or customs-duty mistakes.",
+      "provenance": {
+        "type": "MODEL_HYPOTHESIS",
+        "source_ai": [
+          "Gemini"
+        ],
+        "meeting": "#004",
+        "source_rank": "Gemini #7"
+      },
+      "annotation": {
+        "status": "HOLDOUT_UNLABELED"
+      }
+    },
+    {
+      "id": "H08",
+      "set": "HOLDOUT",
+      "run_policy": "DO_NOT_TUNE_ON",
+      "category": "warehouse",
+      "title": "Warehouse Receiving",
+      "description": "Legacy/re-screened hypothesis concerning receiving operations and friction in warehouse inbound workflows.",
+      "provenance": {
+        "type": "MODEL_HYPOTHESIS",
+        "source_ai": [
+          "Perplexity"
+        ],
+        "meeting": "#004",
+        "source_rank": "Perplexity #7"
+      },
+      "annotation": {
+        "status": "HOLDOUT_UNLABELED"
+      }
+    }
+  ]
+}

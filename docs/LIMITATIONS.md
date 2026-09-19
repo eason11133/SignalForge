@@ -36,5 +36,4 @@ SignalForge 是 research infrastructure，不是市場預測器。以下限制�
 
 ## Public repository scope
 
-本 repo 是精選的 portfolio snapshot，不包含完整 production application、deployment configuration、runtime database、私人資料、credentials、installer、rollback bundle 或歷史 hotfix。部分 source 依賴完整應用的其他模組；公開版的目的在於讓審查者閱讀核心設計與執行代表性測試，而不是直接部署 production。
-
+本 repo 包含 SignalForge production working tree 的完整 current source，但刻意不包含 runtime database、私人資料、credentials、cache、installer/export package、rollback bundle 與歷史 backup。外部來源仍需要使用者自行提供 API keys 與服務設定；完整排除規則與檔案計數記錄於 [`FULL_SOURCE_MANIFEST.md`](../FULL_SOURCE_MANIFEST.md)。

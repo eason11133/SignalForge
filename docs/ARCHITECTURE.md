@@ -94,14 +94,15 @@ flowchart LR
 
 因此 `FAILED` 表示這次 request 沒完成，不表示市場沒有 signal；`SUCCESS + 0` 也只表示這個 query / source / time window 沒找到結果。
 
-## Public portfolio source map
+## Source map
 
-- `src/api/signalforge_research_backlog.py`：API routing 與 request / response boundary。
-- `src/api/signalforge_research_persistence.py`：durable run、idempotency、reconnect。
-- `src/processors/signalforge_research_backlog.py`：backlog state、quality gate、history。
-- `src/processors/signalforge_founder_idea_loop.py`：query bridge、source retrieval、relevance 與 brief 組裝。
-- `src/processors/signalforge_source_expansion.py`：source portfolio 與多 query dispatch。
-- `src/processors/signalforge_source_adapters.py` 與 `signalforge_source_registry.py`：公開來源 adapter、能力與 runtime state。
-- `src/processors/signalforge_founder_query_contracts.py` 與 `signalforge_founder_hypothesis_registry.py`：query contract 與 research history 支援模組。
-- `src/dashboard/*`：React backlog 與 API / persistence client。
-- `tests/*`：persistence lifecycle 與 relevance semantics 的 executable evidence。
+- `api/main.py` 與 `api/routes/`：FastAPI entrypoint、routing 與 request / response boundary。
+- `api/signalforge_research_persistence_v253.py`：durable run、idempotency、reconnect。
+- `processors/signalforge_research_backlog.py`：backlog state、quality gate、history。
+- `processors/signalforge_founder_idea_loop.py`：query bridge、source retrieval、relevance 與 brief 組裝。
+- `processors/signalforge_source_expansion.py`：source portfolio 與 multi-query dispatch。
+- `processors/signalforge_source_adapters.py` 與 `signalforge_source_registry.py`：公開來源 adapter、能力與 runtime state。
+- `processors/` 其餘模組：evidence、opportunity、discovery、validation、runtime 與 calibration pipelines。
+- `scrapers/`：public-source collectors 與 source network adapters。
+- `dashboard/src/`：完整 React UI、API client 與 research persistence client。
+- root-level `run_*.py` / `show_*.py`：smoke、acceptance、regression、audit 與操作 scripts。

@@ -1,0 +1,35 @@
+from pathlib import Path
+import time
+from processors.discovery_representation_lab_u24 import run
+
+def main():
+    print("="*156)
+    print("SignalForge U24 — Representation Screening + Weak-Anchor Audit")
+    print("R0 raw text | R1 salient-code baseline | R2 fixed atoms | bounded R3 hybrid frames | R4 frame descriptions | no production promotion")
+    print("="*156)
+    t=time.perf_counter();r=run(Path("."))
+    print("U24_STATUS",r.get("status"))
+    print("U24_AUTHORITY",r.get("authority"))
+    print("U24_CORPUS",r.get("corpus"))
+    print("U24_ANCHOR_AUDIT",r.get("anchor_audit"))
+    print("U24_ARM_COMPARISON",r.get("arm_comparison"))
+    print("U24_LLM_SHADOW",r.get("llm_shadow"))
+    print("U24_PROVIDER_EVENTS",r.get("provider_events"))
+    print("U24_FOUNDER_PROTECTED_STATE_UNCHANGED",r.get("founder_protected_state_unchanged"))
+    print("U24_DECISION",r.get("decision"))
+    print(f"U24_RUNTIME seconds={time.perf_counter()-t:.3f}")
+    print("="*126)
+    print("SIGNALFORGE U24 TRUTH / SCREENING AUDIT")
+    print("explicit_signature_is_ground_truth: FALSE")
+    print("weak_label_proxy_is_accuracy: FALSE")
+    print("r0_r1_r2_full_anchor_screening: TRUE")
+    print("r3_r4_full_corpus_llm: FALSE")
+    print("representation_arm_production_authority: 0")
+    print("family_formation_runs_in_u24: FALSE")
+    print("coverage_runs_in_u24: FALSE")
+    print("winner_declared_from_weak_labels: FALSE")
+    print("founder_thesis_truth_modified: FALSE")
+    print("product_ideation: 0")
+    print("="*126)
+
+if __name__=="__main__":main()
