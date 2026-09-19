@@ -77,6 +77,7 @@ def main() -> int:
 
         store_path = repo / ".radar_runtime" / "founder_opportunity_research_v1.json"
         os.environ["SIGNALFORGE_BACKLOG_STORE"] = str(store_path)
+        os.environ["SIGNALFORGE_REPO_ROOT"] = str(repo)
         os.environ["SIGNALFORGE_RESEARCH_RUNS_PATH"] = str(repo / ".radar_runtime" / "single_runs.json")
         os.environ["SIGNALFORGE_RESEARCH_REPEAT_COOLDOWN_SECONDS"] = "30"
         spec = importlib.util.spec_from_file_location("sf_single_persistence_test", ROOT / "api" / "signalforge_research_persistence_v253.py")

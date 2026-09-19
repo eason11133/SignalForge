@@ -194,13 +194,14 @@ def _response_says_async_started(value: Any) -> bool:
 
 class ResearchRunRegistry:
     def __init__(self) -> None:
-        repo = Path(__file__).resolve().parents[1]
-        runtime = Path(os.environ.get("SIGNALFORGE_RUNTIME_DIR", str(repo / ".radar_runtime")))
+        self.repo = Path(os.environ.get("SIGNALFORGE_REPO_ROOT", str(Path(__file__).resolve().parents[1]))).resolve()
+        runtime = Path(os.environ.get("SIGNALFORGE_RUNTIME_DIR", str(self.repo / ".radar_runtime")))
         self.path = Path(os.environ.get(
             "SIGNALFORGE_RESEARCH_RUNS_PATH",
             str(runtime / "signalforge_research_runs_v2_5_3.json"),
         ))
         self.store_candidates = [
+            runtime / "founder_opportunity_research_v1.json",
             runtime / "idea_research_backlog_v1.json",
             runtime / "signalforge_tracking.json",
             runtime / "tracking_store.json",
@@ -269,7 +270,7 @@ class ResearchRunRegistry:
             run = {
                 "run_id": run_id,
                 "item_key": item_key,
-                "status": "RUNNING",
+                "status": "QUEUED",
                 "process_id": _PROCESS_ID,
                 "request_fingerprint": fp,
                 "request": _jsonable(request_meta),
@@ -344,14 +345,14 @@ class ResearchRunRegistry:
         return max(existing, key=lambda p: p.stat().st_mtime_ns)
 
     def item_exists(self, item_key: str) -> bool:
-        path = self._choose_store()
-        if path is None:
-            return False
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
+            # Use the same late-bound canonical loader/resolver as the GET detail route.
+            # This avoids persistence middleware drifting onto a legacy store filename.
+            from processors.signalforge_research_backlog import backlog_detail
+
+            return backlog_detail(self.repo, item_key).get("status") == "OK"
         except Exception:
             return False
-        return _find_item(data, item_key) is not None
 
     def _sample_store(self, run: Dict[str, Any]) -> Dict[str, Any]:
         path = self._choose_store()
@@ -526,6 +527,7 @@ def _copy_scope_for_background(scope: Dict[str, Any]) -> Dict[str, Any]:
 
 def _background_call(app, scope: Dict[str, Any], body: bytes, run_id: str) -> None:
     try:
+        _REGISTRY.update(run_id, status="RUNNING", started_at=_utcnow())
         status, response_body, _ = asyncio.run(_invoke_asgi(app, scope, body))
         parsed = _safe_json(response_body)
         if status >= 400:
