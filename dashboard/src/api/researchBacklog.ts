@@ -32,6 +32,8 @@ export interface ResearchBacklogCard {
   excerpt?: string;
   url?: string;
   author?: string;
+  profile_url?: string | null;
+  source_published_at?: string | null;
   match_level?: string;
   solution_type?: string;
   tracking_family?: string;
@@ -39,8 +41,83 @@ export interface ResearchBacklogCard {
   first_seen_at?: string;
   last_seen_at?: string;
   seen_count?: number;
+  evidence_kind?: string;
+  actor?: ResearchActor | null;
+  behavior?: ResearchBehavior | null;
+  mention?: ResearchMention | null;
+  observation?: Record<string, unknown>;
   source_grounding?: Record<string, unknown>;
   evidence_trust?: Record<string, unknown>;
+}
+
+export interface ResearchActor {
+  actor_key?: string;
+  display_name?: string | null;
+  handle?: string | null;
+  platform?: string | null;
+  profile_url?: string | null;
+  public_contact_paths?: string[];
+  identity_confidence?: string | null;
+  first_seen_at?: string | null;
+  last_seen_at?: string | null;
+  observation_count?: number;
+  source_urls?: string[];
+  workflows?: string[];
+  workarounds?: string[];
+  product_mentions?: string[];
+}
+
+export interface ResearchBehavior {
+  action?: string | null;
+  object?: string | null;
+  tool_or_product?: string | null;
+  downstream_job?: string | null;
+  frequency_text?: string | null;
+  explicit_frequency?: boolean;
+  workflow_steps?: string[];
+  workaround?: string | null;
+  friction?: string | null;
+}
+
+export interface ResearchMention {
+  canonical_term?: string | null;
+  raw_term?: string | null;
+  mention_type?: string | null;
+  brand_name?: string | null;
+  category_name?: string | null;
+}
+
+export interface RepeatedPattern {
+  pattern_id?: string;
+  canonical_label?: string;
+  evidence_kind?: string;
+  independent_actor_count?: number;
+  material_count?: number;
+  first_seen?: string | null;
+  last_seen?: string | null;
+  supporting_material_ids?: string[];
+  example_evidence?: string[];
+}
+
+export interface BehaviorWindow {
+  window?: string;
+  compared_with?: string;
+  current?: Record<string, number>;
+  previous?: Record<string, number>;
+  delta?: Record<string, number>;
+}
+
+export interface TrendSnapshot {
+  provider?: string;
+  term?: string;
+  geo?: string | null;
+  period_start?: string | null;
+  period_end?: string | null;
+  interval?: string | null;
+  value?: number | null;
+  scale_type?: string | null;
+  fetched_at?: string | null;
+  raw_metadata?: Record<string, unknown>;
 }
 
 export interface OriginalPageCheck {
@@ -140,6 +217,13 @@ export interface ResearchBacklogItem {
   new_product_count?: number;
   has_new_data?: boolean;
   last_tracking_delta?: Record<string, number | string>;
+  behavior_tracking_version?: string | null;
+  behavior_windows?: Record<string, BehaviorWindow>;
+  behavior_last_cycle?: Record<string, number | string>;
+  repeated_patterns?: RepeatedPattern[];
+  actors?: ResearchActor[];
+  trend_snapshots?: TrendSnapshot[];
+  trend_provider_status?: Record<string, unknown>;
   founder_reviewed_at?: string | null;
   founder_reviewed_research_count?: number;
   research_count?: number;
@@ -361,5 +445,12 @@ export async function acknowledgeResearchBacklogHandoff(itemId: string, handoffH
   return fetchJSON<{ status?: string; id?: string; handoff_hash?: string; founder_reviewed_at?: string; new_material_count?: number }>(
     `/signalforge/research-backlog/${encodeURIComponent(itemId)}/handoff-copied`,
     { method: "POST", body: JSON.stringify({ handoff_hash: handoffHash }) },
+  );
+}
+
+export async function importResearchBacklogTrendSnapshots(itemId: string, rows: TrendSnapshot[]) {
+  return fetchJSON<{ status?: string; id?: string; added?: number; total?: number; market_truth_writes?: number }>(
+    `/signalforge/research-backlog/${encodeURIComponent(itemId)}/trends/import`,
+    { method: "POST", body: JSON.stringify({ rows }) },
   );
 }

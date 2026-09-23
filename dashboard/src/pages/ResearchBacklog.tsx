@@ -528,6 +528,12 @@ export default function ResearchBacklog() {
   const currentRunActive = ACTIVE_RUN_STATUSES.has(currentRunStatus);
   const library: MaterialLibrary = useMemo(() => selected?.material_library || {}, [selected?.material_library]);
   const stats = selected?.material_stats || {};
+  const behavior7d = selected?.behavior_windows?.["7d"];
+  const behaviorCurrent = behavior7d?.current || {};
+  const behaviorDelta = behavior7d?.delta || {};
+  const repeatedPatterns = selected?.repeated_patterns || [];
+  const actors = selected?.actors || [];
+  const trendSnapshots = selected?.trend_snapshots || [];
 
   const allMaterials = useMemo(() => {
     const rows: Array<{ category: string; card: ResearchBacklogCard }> = [];
@@ -843,6 +849,61 @@ export default function ResearchBacklog() {
                       {selected.source_retry_after ? ` 下次重試 ${fmtTime(selected.source_retry_after)}` : ""}
                     </div>
                   ) : null}
+                </section>
+
+                <section className="rounded-2xl border border-border-secondary bg-bg-primary p-4">
+                  <div className="flex items-center gap-2"><Activity size={15} className="text-info" /><h2 className="text-base font-semibold text-text-primary">最近變化</h2></div>
+                  <p className="mt-1 text-xs text-text-secondary">只描述最近觀察到的行為與來源變化，不代表需求強弱或商機評分。</p>
+                  <div className="mt-3 grid gap-2 grid-cols-2 md:grid-cols-4">
+                    {[
+                      ["近 7 天人物", n(behaviorCurrent.unique_actors), n(behaviorDelta.unique_actors)],
+                      ["workaround", n(behaviorCurrent.workaround_mentions), n(behaviorDelta.workaround_mentions)],
+                      ["重複人物", n(behaviorCurrent.repeat_actor_count), n(behaviorDelta.repeat_actor_count)],
+                      ["切換工具", n(behaviorCurrent.switching_mentions), n(behaviorDelta.switching_mentions)],
+                    ].map(([label, value, delta]) => (
+                      <div key={String(label)} className="rounded-xl border border-border-secondary bg-bg-secondary p-3">
+                        <div className="text-[9px] font-semibold text-text-tertiary">{label}</div>
+                        <div className="mt-1 flex items-baseline gap-2"><span className="text-base font-semibold text-text-primary">{value}</span><span className="text-[9px] text-text-tertiary">vs 前 7 天 {Number(delta) >= 0 ? "+" : ""}{delta}</span></div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 grid gap-3 xl:grid-cols-2">
+                    <div className="rounded-xl border border-border-secondary bg-bg-secondary p-3">
+                      <div className="text-[10px] font-semibold text-text-primary">反覆出現</div>
+                      <div className="mt-2 space-y-2">
+                        {repeatedPatterns.length ? repeatedPatterns.slice(0, 8).map((pattern) => (
+                          <div key={pattern.pattern_id || pattern.canonical_label} className="rounded-lg bg-bg-primary p-2.5">
+                            <div className="text-[11px] font-semibold text-text-primary">{pattern.canonical_label || "未命名 pattern"}</div>
+                            <div className="mt-1 text-[9px] text-text-tertiary">{n(pattern.independent_actor_count)} people · {n(pattern.material_count)} materials · {pattern.evidence_kind || "OTHER"}</div>
+                            {pattern.example_evidence?.[0] ? <div className="mt-1 line-clamp-2 text-[10px] leading-4 text-text-secondary">{pattern.example_evidence[0]}</div> : null}
+                          </div>
+                        )) : <div className="text-[10px] text-text-tertiary">目前沒有達到 3 位獨立人物支持的重複 pattern。</div>}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-border-secondary bg-bg-secondary p-3">
+                      <div className="text-[10px] font-semibold text-text-primary">人物</div>
+                      <div className="mt-2 space-y-2">
+                        {actors.length ? actors.slice(0, 8).map((actor) => (
+                          <div key={actor.actor_key || `${actor.platform}-${actor.handle}`} className="rounded-lg bg-bg-primary p-2.5">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="text-[11px] font-semibold text-text-primary">{actor.display_name || actor.handle || "public actor"}</div>
+                              <div className="text-[9px] text-text-tertiary">{actor.platform || "web"} · {n(actor.observation_count)} observations</div>
+                            </div>
+                            <div className="mt-1 text-[9px] text-text-tertiary">last seen {fmtTime(actor.last_seen_at)}</div>
+                            {actor.workarounds?.length ? <div className="mt-1 text-[10px] text-text-secondary">workaround: {actor.workarounds.slice(0, 3).join(" / ")}</div> : null}
+                            {actor.public_contact_paths?.[0] ? <a href={actor.public_contact_paths[0]} target="_blank" rel="noreferrer" className="mt-1 block truncate text-[10px] text-info hover:underline">public contact/profile</a> : null}
+                          </div>
+                        )) : <div className="text-[10px] text-text-tertiary">目前材料還沒有足夠的公開 actor identity 可安全合併。</div>}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 rounded-xl border border-border-secondary bg-bg-secondary p-3">
+                    <div className="text-[10px] font-semibold text-text-primary">趨勢資料</div>
+                    {trendSnapshots.length ? <div className="mt-2 space-y-1 text-[10px] text-text-secondary">{trendSnapshots.slice(-6).reverse().map((row, index) => <div key={`${row.provider}-${row.term}-${index}`}>{row.term || "term"} · {row.value ?? "—"} · {row.provider || "provider"} · {row.period_start || ""}</div>)}</div> : <div className="mt-1 text-[10px] text-text-tertiary">尚未連接趨勢資料；SignalForge 仍會正常持續追蹤其他公開 evidence。</div>}
+                  </div>
                 </section>
 
                 {newMaterials.length ? (

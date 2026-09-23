@@ -98,6 +98,21 @@ async def research_backlog_add_ideas(payload: dict[str, Any]):
     return {**result, "auto_start": auto_start}
 
 
+@router.post("/research-backlog/{item_id}/trends/import")
+async def research_backlog_import_trends(item_id: str, payload: dict[str, Any]):
+    from processors.signalforge_research_backlog import import_trend_snapshots
+
+    rows = payload.get("rows") if isinstance(payload.get("rows"), list) else []
+    if not rows:
+        raise HTTPException(status_code=422, detail="rows must contain at least one trend snapshot")
+    if len(rows) > 500:
+        raise HTTPException(status_code=422, detail="trend import is bounded to 500 rows")
+    result = import_trend_snapshots(_REPO_ROOT, item_id, [row for row in rows if isinstance(row, dict)])
+    if result.get("status") == "NOT_FOUND":
+        raise HTTPException(status_code=404, detail="research backlog item not found")
+    return result
+
+
 
 def _traceable_http_url(value: Any) -> str:
     url = str(value or "").strip()
@@ -703,13 +718,23 @@ def _tracking_ai_link_query_specs(*, mode: str, coverage: Mapping[str, Any] | No
     add("AI_LINK_ARTICLES_CASES", "research_cases",
         '(ChatGPT OR Claude OR generative AI) (web access OR URL access OR link access OR browsing) (limitation OR workaround OR retrieval OR context)')
 
+    # Behavior-focused evidence: routine/stack/category language can be relevant without complaint wording.
+    add("AI_LINK_BEHAVIOR_ROUTINE", "behavior_routines",
+        '(ChatGPT OR Claude) (YouTube OR Instagram OR TikTok OR PDF OR webpage) ("my workflow" OR "how I use" OR routine OR setup OR stack)')
+    add("AI_LINK_BEHAVIOR_TRANSCRIPT", "behavior_routines",
+        '(ChatGPT OR Claude) (YouTube OR video) (transcript OR Whisper OR yt-dlp OR screenshot) (workflow OR routine OR "how I")')
+    add("AI_LINK_CATEGORY_LANGUAGE", "category_language",
+        '(ChatGPT OR Claude) (YouTube OR Instagram OR TikTok OR webpage OR URL) ("need a way" OR "is there a way" OR "how do I" OR "tool for")')
+    add("AI_LINK_SWITCHING", "switching_signals",
+        '(Claude OR ChatGPT) (NotebookLM OR Gemini OR Perplexity) ("switch to" OR "use instead" OR "moved to" OR "because Claude" OR "because ChatGPT") (video OR URL OR link OR webpage OR transcript)')
+
     mode_u = str(mode or "DELTA_REFRESH").upper()
     if mode_u == "BROAD_FIRST_PASS":
         return specs[:24]
     if mode_u == "COVERAGE_REFILL":
         return specs[:20]
     # Recurring refresh: keep a healthy mix but do not spam every family on every cycle.
-    selected = [specs[0]]
+    selected = [specs[0]] + [x for x in specs if x[1] in {"behavior_routines", "category_language", "switching_signals"}]
     if low("discussions", 40):
         selected += [x for x in specs if x[1] in {"public_discussions", "practitioner_communities", "vendor_support_communities", "manual_workarounds"}]
     if low("products", 20):
@@ -722,7 +747,7 @@ def _tracking_ai_link_query_specs(*, mode: str, coverage: Mapping[str, Any] | No
         if row[0] in seen:
             continue
         seen.add(row[0]); out.append(row)
-    return out[:16]
+    return out[:20]
 
 
 def _tracking_row_text(row: Mapping[str, Any]) -> str:
@@ -737,6 +762,7 @@ def _tracking_ai_link_row_relevant(row: Mapping[str, Any]) -> bool:
     access = any(x in text for x in (
         "access", "read", "open", "browse", "fetch", "scrap", "extract", "summar", "context", "transcript",
         "caption", "copy paste", "copy-paste", "upload", "download", "extension", "mcp", "inaccessible", "blocked",
+        "screenshot", "whisper", "yt-dlp", "workflow", "routine", "setup", "need a way", "how do i", "use instead", "switch to",
     ))
     return ai and source and access
 
@@ -986,6 +1012,25 @@ def _tracking_web_query_specs(
         add("TRACKING_JOB_PROCUREMENT_SIGNALS", "job_procurement_signals",
             f'{problem} (RFP OR tender OR procurement OR specification OR "job description" OR hiring OR requirements)')
 
+    def add_behavior_depth() -> None:
+        # Behavior + Trend V1: discover routines, stacks, category language and switching even when
+        # the source contains no complaint. These are evidence-acquisition queries, not market scores.
+        add("TRACKING_BEHAVIOR_ROUTINE", "behavior_routines",
+            f'{human_workflow} ("how I use" OR "my workflow" OR routine OR setup OR stack OR "day in the life" OR tutorial)')
+        add("TRACKING_BEHAVIOR_WHAT_I_USE", "behavior_routines",
+            f'{human_core} ("what I use" OR "tools I use" OR "my stack" OR "my setup" OR workflow)')
+        add("TRACKING_BEHAVIOR_CATEGORY_LANGUAGE", "category_language",
+            f'{human_problem} ("need a way" OR "looking for a way" OR "tool for" OR "something that" OR "how do I" OR "how can I")')
+        add("TRACKING_BEHAVIOR_SWITCHING", "switching_signals",
+            f'{human_workflow} ("switch to" OR "moved to" OR "use instead" OR "because it cannot" OR "because it can\'t" OR alternative)')
+        add("TRACKING_BEHAVIOR_REPEATED_CONTENT", "behavior_routines",
+            f'(site:youtube.com/watch OR site:linkedin.com/posts) {human_core} (workflow OR routine OR setup OR stack OR tools OR tutorial)')
+        if local_subject and _CJK_RE.search(local_subject):
+            add("TRACKING_LOCAL_BEHAVIOR_ROUTINE", "behavior_routines",
+                f'{local_task or local_failure or local_subject[:120]} (我的流程 OR 日常 OR 怎麼做 OR 使用工具 OR 工作流 OR 教學 OR 設定)')
+            add("TRACKING_LOCAL_CATEGORY_LANGUAGE", "category_language",
+                f'{local_failure or local_task or local_subject[:120]} (需要一個 OR 有沒有辦法 OR 有沒有工具 OR 怎麼做 OR 替代方案)')
+
     mode = str(mode or "DELTA_REFRESH").upper()
     if mode == "BROAD_FIRST_PASS":
         add("TRACKING_GENERAL_WEB", "general_web", core, 20)
@@ -996,7 +1041,8 @@ def _tracking_web_query_specs(
         add_product_depth()
         add_workaround_depth()
         add_article_depth()
-        return specs[:38]
+        add_behavior_depth()
+        return specs[:44]
 
     if mode == "COVERAGE_REFILL":
         add("TRACKING_GENERAL_WEB_REFILL", "general_web", problem, 20)
@@ -1010,7 +1056,8 @@ def _tracking_web_query_specs(
             add_article_depth()
         if missing("total"):
             add_workaround_depth()
-        return specs[:30]
+        add_behavior_depth()
+        return specs[:36]
 
     # Recurring refresh: human voice remains a standing priority until the collector has depth.
     add("TRACKING_GENERAL_WEB", "general_web", core, 20)
@@ -1028,6 +1075,8 @@ def _tracking_web_query_specs(
     add("TRACKING_RELATED_PRODUCTS", "related_products",
         f'{core} (software OR service OR platform OR tool OR vendor OR solution) (pricing OR product OR features)', 20)
 
+    add_behavior_depth()
+
     family_query = {
         "public_discussions": f'site:reddit.com {human_problem} (workaround OR experience OR "what do you use" OR complaint)',
         "practitioner_communities": f'(site:quora.com OR site:stackexchange.com OR site:youtube.com/watch OR site:linkedin.com/posts) {human_problem} (experience OR workflow OR recommendation)',
@@ -1041,6 +1090,9 @@ def _tracking_web_query_specs(
         "b2b_operational_signals": f'{workflow} (SOP OR operations OR workflow OR consultant OR checklist)',
         "job_procurement_signals": f'{problem} (RFP OR tender OR procurement OR "job description" OR requirements)',
         "related_products": f'{core} (software OR service OR platform OR tool OR solution) (pricing OR features)',
+        "behavior_routines": f'{human_workflow} ("how I use" OR "my workflow" OR routine OR setup OR stack OR "day in the life")',
+        "category_language": f'{human_problem} ("need a way" OR "looking for a way" OR "tool for" OR "how do I")',
+        "switching_signals": f'{human_workflow} ("switch to" OR "moved to" OR "use instead" OR alternative)',
     }
     for family in preferred_families:
         query = family_query.get(str(family or ""))
@@ -1051,7 +1103,7 @@ def _tracking_web_query_specs(
     exploration = [
         "domain_forums", "vendor_support_communities", "practitioner_communities", "product_reviews",
         "app_marketplaces", "job_procurement_signals", "academic_sources", "research_cases",
-        "manual_workarounds", "public_discussions",
+        "manual_workarounds", "public_discussions", "behavior_routines", "category_language", "switching_signals",
     ]
     exp = exploration[int(cycle_index or 0) % len(exploration)]
     if exp in family_query:

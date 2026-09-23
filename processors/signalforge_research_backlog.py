@@ -14,6 +14,14 @@ from pathlib import Path
 from typing import Any, Awaitable, Callable, Mapping, Sequence
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
+from processors.signalforge_behavior_tracking import (
+    BEHAVIOR_TRACKING_VERSION,
+    ManualTrendsProvider,
+    enrich_material,
+    migrate_behavior_state,
+    record_behavior_cycle,
+)
+
 ENGINE_VERSION = "signalforge-research-backlog-v1.6-parallel-freshness-hotfix11"
 STORE_PATH = Path(".radar_runtime/founder_opportunity_research_v1.json")
 LEGACY_STORE_PATH = Path(".radar_runtime/idea_research_backlog_v1.json")
@@ -2244,6 +2252,8 @@ def _compact_card(row: Mapping[str, Any]) -> dict[str, Any]:
         "excerpt": _clean(row.get("excerpt"))[:700],
         "url": _traceable_url(row.get("url")) or None,
         "author": row.get("author"),
+        "profile_url": row.get("profile_url"),
+        "source_published_at": row.get("source_published_at") or row.get("published_at") or row.get("created_at") or row.get("date"),
         "match_level": row.get("match_level"),
         "solution_type": row.get("solution_type"),
         "tracking_family": row.get("tracking_family"),
@@ -2471,6 +2481,7 @@ def _preferred_tracking_families(item: Mapping[str, Any]) -> list[str]:
     positive = [family for family in ranked if int(yields.get(family) or 0) > 0]
     fallback = [
         "public_discussions", "vendor_support_communities", "product_reviews", "manual_workarounds",
+        "behavior_routines", "category_language", "switching_signals",
         "related_products", "app_marketplaces", "research_cases", "academic_sources", "b2b_operational_signals",
     ]
     out: list[str] = []
@@ -3997,7 +4008,7 @@ def reset_store_for_acceptance(repo: str | Path) -> None:
 # compatibility, but the active scheduler/state/view contract below replaces it.
 # ============================================================================
 
-ENGINE_VERSION = "signalforge-tracking-research-quality-v2.5.5"
+ENGINE_VERSION = "signalforge-behavior-trend-continuous-v1"
 TRUTH_BOUNDARY = (
     "SIGNALFORGE_TRACKS_RELATED_PUBLIC_MATERIAL_ONLY;_"
     "RELEVANCE_FILTERING_IS_NOT_MARKET_ANALYSIS;_"
@@ -4005,15 +4016,16 @@ TRUTH_BOUNDARY = (
     "CHATGPT_AND_FOUNDER_OWN_ANALYSIS_AND_JUDGMENT"
 )
 _TRACKING_PIVOT_VERSION = "TRACKING_PIVOT_V2"
-_TRACKING_SOURCE_EXPANSION_VERSION = "TRACKING_HUMANVOICE_V2_5"
+_TRACKING_SOURCE_EXPANSION_VERSION = "TRACKING_BEHAVIOR_TREND_V1"
 _TRACKING_RELEVANCE_VERSION = "tracking-relevance-v2.5"
-_TRACKING_BROAD_QUERY_FANOUT = 38
-_TRACKING_REFRESH_QUERY_FANOUT = 16
+_TRACKING_BROAD_QUERY_FANOUT = 44
+_TRACKING_REFRESH_QUERY_FANOUT = 20
 _TRACKING_SOURCE_FAMILIES = (
     "general_web", "local_language", "public_discussions", "practitioner_communities",
     "vendor_support_communities", "domain_forums", "product_reviews", "app_marketplaces", "related_products",
     "manual_workarounds", "research_cases", "academic_sources",
     "b2b_operational_signals", "job_procurement_signals",
+    "behavior_routines", "category_language", "switching_signals",
 )
 _TRACKING_INTERVAL_SECONDS = 12 * 3600
 _TRACKING_MAX_LIBRARY_PER_CATEGORY = 500
@@ -4239,7 +4251,8 @@ def _tracking_card(row: Mapping[str, Any], *, first_seen_at: str, last_seen_at: 
     card["first_seen_at"] = first_seen_at
     card["last_seen_at"] = last_seen_at or first_seen_at
     card["seen_count"] = max(1, int(row.get("seen_count") or 1))
-    return card
+    enriched = enrich_material(card, observed_at=last_seen_at or first_seen_at)
+    return enriched
 
 
 def _tracking_seen_cutoff(item: Mapping[str, Any]) -> datetime | None:
@@ -4404,6 +4417,7 @@ def _tracking_category_for_row(default_category: str, row: Mapping[str, Any]) ->
 def _merge_material_result(item: dict[str, Any], result: Mapping[str, Any], seen_at: str) -> dict[str, int]:
     brief = _brief(result)
     added = {key: 0 for key in _TRACKING_CATEGORIES}
+    qualified_rows: list[Mapping[str, Any]] = []
     for default_category, source_key in _TRACKING_BRIEF_FIELDS.items():
         values = brief.get(source_key)
         if not isinstance(values, list):
@@ -4415,11 +4429,21 @@ def _merge_material_result(item: dict[str, Any], result: Mapping[str, Any], seen
             verdict = _clean(trust.get("verdict")).upper()
             if verdict not in {"RELATED", "QUALIFIED"}:
                 continue
-            category = _tracking_category_for_row(default_category, row)
-            if _merge_material_card(item, category, row, seen_at):
+            enriched = enrich_material(row, observed_at=seen_at)
+            qualified_rows.append(enriched)
+            category = _tracking_category_for_row(default_category, enriched)
+            if _merge_material_card(item, category, enriched, seen_at):
                 added[category] += 1
+    behavior_cycle = record_behavior_cycle(item, qualified_rows, seen_at)
     _refresh_material_stats(item)
-    item["last_tracking_delta"] = {**added, "total": sum(added.values()), "at": seen_at}
+    item["last_tracking_delta"] = {
+        **added,
+        "total": sum(added.values()),
+        "at": seen_at,
+        "new_observations": int(behavior_cycle.get("new_observations") or 0),
+        "known_actor_count": int(behavior_cycle.get("known_actor_count") or 0),
+        "surfaced_pattern_count": int(behavior_cycle.get("surfaced_pattern_count") or 0),
+    }
     return added
 
 
@@ -4535,6 +4559,8 @@ def _migrate_tracking_pivot(store: dict[str, Any]) -> bool:
             _refresh_material_stats(item)
             if before_stats != item.get("material_stats"):
                 changed = True
+        if migrate_behavior_state(item):
+            changed = True
     return changed
 
 
@@ -4633,6 +4659,14 @@ def _new_item(seed: Mapping[str, Any]) -> dict[str, Any]:
         "research_coverage": {},
         "review_priority": 0,
         "needs_founder": False,
+        "behavior_tracking_version": BEHAVIOR_TRACKING_VERSION,
+        "behavior_observations": [],
+        "actor_index": {},
+        "repeated_patterns": [],
+        "behavior_windows": {},
+        "behavior_last_cycle": {},
+        "trend_snapshots": [],
+        "trend_provider_status": {"provider": "NONE", "status": "NOT_CONFIGURED"},
     })
     return item
 
@@ -5185,6 +5219,17 @@ def _item_for_view(item: Mapping[str, Any], *, include_history: bool = False, in
         "new_product_count": int(item.get("new_product_count") or 0),
         "has_new_data": bool(item.get("has_new_data")),
         "last_tracking_delta": dict(item.get("last_tracking_delta") or {}),
+        "behavior_tracking_version": item.get("behavior_tracking_version"),
+        "behavior_windows": copy.deepcopy(dict(item.get("behavior_windows") or {})),
+        "behavior_last_cycle": copy.deepcopy(dict(item.get("behavior_last_cycle") or {})),
+        "repeated_patterns": copy.deepcopy(list(item.get("repeated_patterns") or [])),
+        "actors": copy.deepcopy(sorted(
+            [row for row in (item.get("actor_index") or {}).values() if isinstance(row, Mapping)],
+            key=lambda row: (_clean(row.get("last_seen_at")), int(row.get("observation_count") or 0)),
+            reverse=True,
+        )[:120]),
+        "trend_snapshots": copy.deepcopy(list(item.get("trend_snapshots") or [])[-120:]),
+        "trend_provider_status": copy.deepcopy(dict(item.get("trend_provider_status") or {})),
         "founder_reviewed_at": item.get("founder_reviewed_at"),
         "founder_reviewed_research_count": int(item.get("founder_reviewed_research_count") or 0),
         "research_count": len(history),
@@ -5380,7 +5425,28 @@ def build_handoff_text(item: Mapping[str, Any]) -> str:
         "source_family_materials=" + ", ".join(f"{k}:{v}" for k, v in list(_tracking_material_family_stats(item).items())[:10]),
         f"research_quality={_clean(item.get('tracking_research_quality_version')) or 'legacy'} | quarantined_unrelated={len(item.get('material_quarantine') or [])}",
         "source_expansion_health=" + json.dumps(item.get("tracking_expansion_health") or {}, ensure_ascii=False, sort_keys=True),
+        "behavior_tracking_version=" + _clean(item.get("behavior_tracking_version")),
+        "behavior_7d=" + json.dumps((item.get("behavior_windows") or {}).get("7d") or {}, ensure_ascii=False, sort_keys=True),
+        "behavior_30d=" + json.dumps((item.get("behavior_windows") or {}).get("30d") or {}, ensure_ascii=False, sort_keys=True),
     ])
+    patterns = [row for row in (item.get("repeated_patterns") or []) if isinstance(row, Mapping)]
+    if patterns:
+        lines.extend(["", "REPEATED BEHAVIOR / MENTION PATTERNS — DESCRIPTIVE ONLY"])
+        for row in patterns[:12]:
+            lines.append(
+                f"- {_clean(row.get('canonical_label'))} | kind={_clean(row.get('evidence_kind'))} | independent_actors={int(row.get('independent_actor_count') or 0)} | materials={int(row.get('material_count') or 0)} | first_seen={_clean(row.get('first_seen'))} | last_seen={_clean(row.get('last_seen'))}"
+            )
+    actors = [row for row in (item.get("actor_index") or {}).values() if isinstance(row, Mapping)]
+    actors.sort(key=lambda row: (_clean(row.get("last_seen_at")), int(row.get("observation_count") or 0)), reverse=True)
+    if actors:
+        lines.extend(["", "PUBLIC ACTORS — OBSERVATION CONTINUITY ONLY"])
+        for row in actors[:20]:
+            lines.append(
+                f"- {_clean(row.get('display_name') or row.get('handle') or 'actor')} | platform={_clean(row.get('platform'))} | observations={int(row.get('observation_count') or 0)} | last_seen={_clean(row.get('last_seen_at'))}"
+            )
+            contacts = [str(x) for x in (row.get("public_contact_paths") or []) if str(x).startswith(("http://", "https://"))]
+            if contacts:
+                lines.append(f"  public_contact={contacts[0]}")
     sections = (
         ("RELATED PRODUCTS", "products", 20),
         ("REAL DISCUSSIONS / COMMENTS / POSTS", "discussions", 20),
@@ -5446,6 +5512,35 @@ def acknowledge_handoff(repo: str | Path, item_id: str, expected_hash: str | Non
         "market_truth_writes": 0,
         "truth_boundary": TRUTH_BOUNDARY,
     }
+
+
+def import_trend_snapshots(repo: str | Path, item_id: str, rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Import provider-neutral/manual trend snapshots without treating them as market truth."""
+    store = load_store(repo, repair_worker=False)
+    item = (store.get("items") or {}).get(item_id) if isinstance(store.get("items"), Mapping) else None
+    if not isinstance(item, dict):
+        return {"status": "NOT_FOUND", "id": item_id, "market_truth_writes": 0, "truth_boundary": TRUTH_BOUNDARY}
+    normalized = ManualTrendsProvider.normalize(rows)
+    existing = item.setdefault("trend_snapshots", [])
+    seen = {
+        (_clean(row.get("provider")), _clean(row.get("term")), _clean(row.get("geo")), _clean(row.get("period_start")), _clean(row.get("period_end")), _clean(row.get("interval")))
+        for row in existing if isinstance(row, Mapping)
+    }
+    added = 0
+    for row in normalized:
+        key = (_clean(row.get("provider")), _clean(row.get("term")), _clean(row.get("geo")), _clean(row.get("period_start")), _clean(row.get("period_end")), _clean(row.get("interval")))
+        if key in seen:
+            continue
+        existing.append(dict(row))
+        seen.add(key)
+        added += 1
+    if len(existing) > 500:
+        del existing[: len(existing) - 500]
+    item["trend_provider_status"] = {"provider": "MANUAL_TRENDS_IMPORT", "status": "AVAILABLE", "last_import_at": _now()}
+    item["latest_change"] = "TREND_SNAPSHOTS_IMPORTED"
+    item["updated_at"] = _now()
+    save_store(repo, store)
+    return {"status": "IMPORTED", "id": item_id, "added": added, "total": len(existing), "market_truth_writes": 0, "truth_boundary": TRUTH_BOUNDARY}
 
 
 def request_tracking_refresh(repo: str | Path, item_id: str) -> dict[str, Any]:
