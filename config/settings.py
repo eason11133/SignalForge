@@ -3,6 +3,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# SignalForge runtime storage mode.
+# Default is local/file-backed so the current Research Backlog can run without Docker.
+# Set SIGNALFORGE_STORAGE_MODE=postgres to re-enable the legacy PostgreSQL/Redis stack.
+SIGNALFORGE_STORAGE_MODE = os.getenv("SIGNALFORGE_STORAGE_MODE", "local").strip().lower()
+SIGNALFORGE_LOCAL_MODE = SIGNALFORGE_STORAGE_MODE in {"local", "file", "offline", "dockerless"}
+
 # Database
 DATABASE_URL = os.getenv(
     "DATABASE_URL",

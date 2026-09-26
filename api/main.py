@@ -33,6 +33,8 @@ from database.connection import (
 
 logger = structlog.get_logger()
 
+from config.settings import SIGNALFORGE_LOCAL_MODE, SIGNALFORGE_STORAGE_MODE
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -40,82 +42,107 @@ async def lifespan(app: FastAPI):
     app.state.database_ready = False
     app.state.database_error = None
     app.state.database_last_checked_at = None
-    # ── DB init ──────────────────────────────────────────────────────────────
-    try:
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-            result = await conn.execute(text("SELECT COUNT(*) FROM platforms"))
-            count = result.scalar()
-            if count == 0:
-                await conn.execute(text("""
-                    INSERT INTO platforms (name) VALUES
-                    ('reddit'), ('hackernews'), ('github'), ('arxiv'),
-                    ('producthunt'), ('stackoverflow'), ('youtube'),
-                    ('news'), ('twitter'), ('linkedin')
-                    ON CONFLICT (name) DO NOTHING
-                """))
-        app.state.database_ready = True
+    # ── Storage init ─────────────────────────────────────────────────────────
+    # Current SignalForge Research Backlog / materials / history / behavior state are
+    # file-backed under .radar_runtime.  Docker/PostgreSQL is now optional legacy
+    # infrastructure instead of a startup requirement.
+    app.state.storage_mode = SIGNALFORGE_STORAGE_MODE
+    app.state.signalforge_core_ready = True
+    if SIGNALFORGE_LOCAL_MODE:
+        app.state.database_ready = False
         app.state.database_error = None
         app.state.database_last_checked_at = time.time()
-        logger.info("database_initialized")
-    except Exception as e:
-        app.state.database_ready = False
-        app.state.database_error = f"{type(e).__name__}: {e}"
-        app.state.database_last_checked_at = time.time()
-        logger.error("database_init_failed", error=str(e))
+        logger.info(
+            "signalforge_local_storage_ready",
+            storage_mode=SIGNALFORGE_STORAGE_MODE,
+            database_required=False,
+            research_store=".radar_runtime",
+        )
+    else:
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+                result = await conn.execute(text("SELECT COUNT(*) FROM platforms"))
+                count = result.scalar()
+                if count == 0:
+                    await conn.execute(text("""
+                        INSERT INTO platforms (name) VALUES
+                        ('reddit'), ('hackernews'), ('github'), ('arxiv'),
+                        ('producthunt'), ('stackoverflow'), ('youtube'),
+                        ('news'), ('twitter'), ('linkedin')
+                        ON CONFLICT (name) DO NOTHING
+                    """))
+            app.state.database_ready = True
+            app.state.database_error = None
+            app.state.database_last_checked_at = time.time()
+            logger.info("database_initialized")
+        except Exception as e:
+            app.state.database_ready = False
+            app.state.database_error = f"{type(e).__name__}: {e}"
+            app.state.database_last_checked_at = time.time()
+            logger.error("database_init_failed", error=str(e))
 
     # ── Wire broadcast so pipeline can push WebSocket events ─────────────────
     from api.routes.websocket import broadcast
     set_broadcast(broadcast)
 
     # ── Scheduler ────────────────────────────────────────────────────────────
-    interval_hours = int(os.getenv("PIPELINE_INTERVAL_HOURS", "24"))
-    scheduler = AsyncIOScheduler()
-    scheduler.add_job(
-        run_pipeline,
-        trigger=IntervalTrigger(hours=interval_hours),
-        id="pipeline",
-        name="Scraper pipeline",
-        replace_existing=True,
-        misfire_grace_time=3600,
-    )
+    # The legacy DB-backed scraper/signalforge scheduler is disabled in local mode.
+    # ResearchBacklog keeps its own file-backed supervisor and single-item runs, so
+    # current SignalForge research remains usable without PostgreSQL/Redis.
+    scheduler: AsyncIOScheduler | None = None
+    if not SIGNALFORGE_LOCAL_MODE:
+        interval_hours = int(os.getenv("PIPELINE_INTERVAL_HOURS", "24"))
+        scheduler = AsyncIOScheduler()
+        scheduler.add_job(
+            run_pipeline,
+            trigger=IntervalTrigger(hours=interval_hours),
+            id="pipeline",
+            name="Scraper pipeline",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
 
-    # SignalForge has its own stale-aware operating loop. Windows sleep pauses
-    # Python naturally; on wake APScheduler coalesces missed checks, while the
-    # runtime itself refuses work when the last successful cycle is still fresh.
-    signalforge_interval = max(1, int(os.getenv("SIGNALFORGE_CHECK_INTERVAL_HOURS", "1") or 1))
-    scheduler.add_job(
-        launch_signalforge_cycle_nonblocking,
-        trigger=IntervalTrigger(hours=signalforge_interval),
-        kwargs={"force": False, "reason": "scheduler_or_wake"},
-        id="signalforge",
-        name="SignalForge stale-aware research",
-        replace_existing=True,
-        coalesce=True,
-        misfire_grace_time=86400,
-        max_instances=1,
-    )
-    scheduler.start()
+        signalforge_interval = max(1, int(os.getenv("SIGNALFORGE_CHECK_INTERVAL_HOURS", "1") or 1))
+        scheduler.add_job(
+            launch_signalforge_cycle_nonblocking,
+            trigger=IntervalTrigger(hours=signalforge_interval),
+            kwargs={"force": False, "reason": "scheduler_or_wake"},
+            id="signalforge",
+            name="SignalForge stale-aware research",
+            replace_existing=True,
+            coalesce=True,
+            misfire_grace_time=86400,
+            max_instances=1,
+        )
+        scheduler.start()
 
-    async def _delayed_signalforge_startup() -> None:
-        delay_seconds = max(15, int(os.getenv("SIGNALFORGE_STARTUP_CATCHUP_DELAY_SECONDS", "60") or 60))
-        await asyncio.sleep(delay_seconds)
-        if not bool(getattr(app.state, "database_ready", False)):
-            logger.warning("signalforge_startup_catchup_skipped", reason="DATABASE_NOT_READY")
-            return
-        launch_signalforge_cycle_nonblocking(force=False, reason="startup_catchup")
+        async def _delayed_signalforge_startup() -> None:
+            delay_seconds = max(15, int(os.getenv("SIGNALFORGE_STARTUP_CATCHUP_DELAY_SECONDS", "60") or 60))
+            await asyncio.sleep(delay_seconds)
+            if not bool(getattr(app.state, "database_ready", False)):
+                logger.warning("signalforge_startup_catchup_skipped", reason="DATABASE_NOT_READY")
+                return
+            launch_signalforge_cycle_nonblocking(force=False, reason="startup_catchup")
 
-    asyncio.create_task(_delayed_signalforge_startup())
-    logger.info(
-        "scheduler_started",
-        interval_hours=interval_hours,
-        signalforge_check_hours=signalforge_interval,
-    )
+        asyncio.create_task(_delayed_signalforge_startup())
+        logger.info(
+            "scheduler_started",
+            interval_hours=interval_hours,
+            signalforge_check_hours=signalforge_interval,
+        )
+    else:
+        logger.info(
+            "legacy_scheduler_skipped",
+            reason="SIGNALFORGE_LOCAL_MODE",
+            research_backlog_supervisor="AVAILABLE_ON_DEMAND",
+        )
 
     yield
 
-    scheduler.shutdown(wait=False)
-    logger.info("scheduler_stopped")
+    if scheduler is not None:
+        scheduler.shutdown(wait=False)
+        logger.info("scheduler_stopped")
 
 
 app = FastAPI(
@@ -152,6 +179,16 @@ async def signalforge_database_truth_guard(request: Request, call_next):
         or path.startswith("/api/candidates")
         or path.startswith("/api/opportunities")
     )
+    if db_backed and SIGNALFORGE_LOCAL_MODE:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "LEGACY_DATABASE_DISABLED_IN_LOCAL_MODE",
+                "detail": "This legacy DB-backed surface is disabled. Current SignalForge Research Backlog remains available from .radar_runtime.",
+                "storage_mode": SIGNALFORGE_STORAGE_MODE,
+                "docker_required": False,
+            },
+        )
     if db_backed and not bool(getattr(request.app.state, "database_ready", False)):
         # Recovery probe: if the database came back after startup, restore service without
         # requiring a process restart. The query changes no state.
@@ -221,15 +258,21 @@ app.include_router(signalforge_brain_v2.router, prefix="/api/signalforge/brain-v
 @app.get("/api/health")
 async def health_check(request: Request):
     db_ready = bool(getattr(request.app.state, "database_ready", False))
+    local_mode = bool(SIGNALFORGE_LOCAL_MODE)
     return {
-        "status": "ok" if db_ready else "degraded",
+        "status": "ok" if (local_mode or db_ready) else "degraded",
         "service": "community-mind-mirror",
+        "storage_mode": SIGNALFORGE_STORAGE_MODE,
+        "signalforge_core_ready": True,
+        "docker_required": not local_mode,
         "database": {
+            "enabled": not local_mode,
             "ready": db_ready,
             "last_error": getattr(request.app.state, "database_error", None),
             "last_checked_at_epoch": getattr(request.app.state, "database_last_checked_at", None),
         },
-        "truth_boundary": "HTTP server health is not database/SignalForge truth health.",
+        "research_backlog_store": ".radar_runtime/founder_opportunity_research_v1.json",
+        "truth_boundary": "Local SignalForge research state is independent from the optional legacy database.",
     }
 
 
@@ -242,7 +285,15 @@ async def spending_status():
 
 @app.post("/api/pipeline/trigger")
 async def trigger_pipeline():
-    """Manually trigger the scraper pipeline (no-op if already running)."""
+    """Manually trigger the legacy DB-backed scraper pipeline."""
+    if SIGNALFORGE_LOCAL_MODE:
+        return JSONResponse(
+            status_code=409,
+            content={
+                "status": "LEGACY_PIPELINE_DISABLED_IN_LOCAL_MODE",
+                "detail": "Current SignalForge Research Backlog can research directly without the legacy PostgreSQL/Redis pipeline.",
+            },
+        )
     if is_running():
         return {"status": "already_running", "message": "Pipeline is already in progress."}
     asyncio.create_task(run_pipeline())
