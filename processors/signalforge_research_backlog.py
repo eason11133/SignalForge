@@ -5269,7 +5269,7 @@ def _item_for_list(item: Mapping[str, Any]) -> dict[str, Any]:
         "tracking_source_expansion_version": item.get("tracking_source_expansion_version"),
         "tracking_source_expansion_pending": bool(item.get("tracking_source_expansion_pending", False)),
         "material_stats": stats,
-        "tracking_family_stats": _tracking_material_family_stats(item),
+        "tracking_family_stats": dict(item.get("tracking_family_stats") or {}),
         "new_material_count": int(item.get("new_material_count") or 0),
         "new_product_count": int(item.get("new_product_count") or 0),
         "has_new_data": bool(item.get("has_new_data")),
@@ -5292,33 +5292,83 @@ def _tracking_sort_key(row: Mapping[str, Any]) -> tuple[Any, ...]:
     )
 
 
-def backlog_view(repo: str | Path = ".", *, q: str = "", status: str = "", limit: int = 500) -> dict[str, Any]:
-    store = load_store(repo, repair_worker=False)
+
+# Dockerless/read-only workspace cache.
+# Read surfaces must never run schema migrations or rewrite the 60MB canonical store.
+# Mutation/research paths continue to use load_store(), preserving all existing write semantics.
+_READ_VIEW_CACHE_LOCK = threading.RLock()
+_READ_VIEW_CACHE: dict[str, Any] = {
+    "signature": None,
+    "base": None,
+}
+_DETAIL_VIEW_CACHE: dict[tuple[Any, str], dict[str, Any]] = {}
+_DETAIL_VIEW_CACHE_ORDER: list[tuple[Any, str]] = []
+_DETAIL_VIEW_CACHE_LIMIT = 6
+
+
+def _store_signature(repo: str | Path = ".") -> tuple[int, int] | None:
+    path = _store_path(repo)
+    try:
+        stat = path.stat()
+    except OSError:
+        return None
+    return (int(stat.st_mtime_ns), int(stat.st_size))
+
+
+def _load_store_readonly(repo: str | Path = ".") -> dict[str, Any]:
+    """Read the current canonical state without migrations, repair or writes.
+
+    Dashboard GETs are observation-only. Running cumulative migration logic on every GET
+    made a ~60MB store time out and also changed the file merely by opening the UI.
+    """
+    path = _store_path(repo)
+    backup_path = _store_backup_path(repo)
+    if not path.exists():
+        return _default_store()
+
+    raw = _read_store_mapping(path)
+    if raw is None and backup_path.exists():
+        raw = _read_store_mapping(backup_path)
+    if not isinstance(raw, dict):
+        blocked = _default_store()
+        blocked["storage_recovery_required"] = True
+        blocked["storage_error"] = "Persistent backlog JSON is unreadable; read-only workspace could not load it."
+        return blocked
+
+    raw.setdefault("items", {})
+    raw.setdefault("order", list((raw.get("items") or {}).keys()))
+    raw.setdefault("worker", {})
+    raw.setdefault("automation", {})
+    raw.setdefault("legacy_archive_summary", {})
+    raw.setdefault("market_truth_writes", 0)
+    raw.setdefault("truth_boundary", TRUTH_BOUNDARY)
+    return raw
+
+
+def _build_backlog_list_base(repo: str | Path = ".") -> dict[str, Any]:
+    signature = _store_signature(repo)
+    with _READ_VIEW_CACHE_LOCK:
+        if _READ_VIEW_CACHE.get("signature") == signature and isinstance(_READ_VIEW_CACHE.get("base"), dict):
+            return _READ_VIEW_CACHE["base"]
+
+    store = _load_store_readonly(repo)
     items = store.get("items") if isinstance(store.get("items"), Mapping) else {}
     order = list(store.get("order") or [])
-    query = _clean(q).lower()
-    status_filter = _clean(status).upper()
     all_rows = [_item_for_list(items[item_id]) for item_id in order if isinstance(items.get(item_id), Mapping)]
     all_rows.sort(key=_tracking_sort_key)
 
-    def matches(row: Mapping[str, Any]) -> bool:
-        if query and query not in _clean(f"{row.get('title')} {row.get('description')}").lower():
-            return False
-        if not status_filter:
-            return True
-        if status_filter == "NEW_DATA":
-            return bool(row.get("has_new_data"))
-        if status_filter == "TRACKING":
-            return _clean(row.get("auto_status")).upper() in {"TRACKING", "TRACKING_NEW", "TRACKING_DUE"}
-        return _clean(row.get("auto_status")).upper() == status_filter
-
-    rows = [row for row in all_rows if matches(row)]
     worker_view = dict(store.get("worker") or {})
     active_jobs = [row for row in (worker_view.get("active_jobs") or []) if isinstance(row, Mapping)]
     worker_view["active_count"] = len(active_jobs)
     worker_view["queued_jobs_estimate"] = _pending_job_estimate(store)
     automation = store.get("automation") if isinstance(store.get("automation"), Mapping) else {}
-    worker_view["max_concurrency"] = max(1, min(int(automation.get("research_concurrency") or _DEFAULT_RESEARCH_CONCURRENCY), _MAX_RESEARCH_CONCURRENCY))
+    worker_view["max_concurrency"] = max(
+        1,
+        min(
+            int(automation.get("research_concurrency") or _DEFAULT_RESEARCH_CONCURRENCY),
+            _MAX_RESEARCH_CONCURRENCY,
+        ),
+    )
 
     summary = {
         "directions": len(all_rows),
@@ -5336,38 +5386,121 @@ def backlog_view(repo: str | Path = ".", *, q: str = "", status: str = "", limit
         "source_families": list(automation.get("source_families") or _TRACKING_SOURCE_FAMILIES),
     }
     counts = {
-        "TRACKING": sum(1 for row in all_rows if _clean(row.get("auto_status")).upper() in {"TRACKING", "TRACKING_NEW", "TRACKING_DUE"}),
+        "TRACKING": sum(
+            1
+            for row in all_rows
+            if _clean(row.get("auto_status")).upper() in {"TRACKING", "TRACKING_NEW", "TRACKING_DUE"}
+        ),
         "SEARCHING": sum(1 for row in all_rows if _clean(row.get("auto_status")).upper() == "SEARCHING"),
         "SOURCE_LIMITED": summary["source_limited"],
         "NEW_DATA": summary["directions_with_new_data"],
     }
     new_rows = [row for row in all_rows if bool(row.get("has_new_data"))][:6]
-    return {
-        "engine_version": ENGINE_VERSION,
+
+    base = {
+        "engine_version": store.get("engine_version") or ENGINE_VERSION,
         "status": "OK",
-        "total": len(all_rows),
-        "filtered": len(rows),
+        "all_rows": all_rows,
         "counts": counts,
         "tracking_summary": summary,
-        # Compatibility keys: no Founder judgment is implied. This is simply the newest-data queue.
         "founder_inbox": new_rows,
         "founder_attention_total": summary["directions_with_new_data"],
-        "items": rows[: max(1, min(int(limit or 1000), 2000))],
         "worker": worker_view,
         "automation": dict(automation),
         "legacy_archive_summary": dict(store.get("legacy_archive_summary") or {}),
         "import_warnings": list((store.get("sync_metadata") or {}).get("import_warnings") or []),
         "market_truth_writes": 0,
-        "truth_boundary": TRUTH_BOUNDARY,
+        "truth_boundary": store.get("truth_boundary") or TRUTH_BOUNDARY,
+    }
+    with _READ_VIEW_CACHE_LOCK:
+        _READ_VIEW_CACHE["signature"] = signature
+        _READ_VIEW_CACHE["base"] = base
+        # A new canonical snapshot invalidates cached full details.
+        stale = [key for key in _DETAIL_VIEW_CACHE if key[0] != signature]
+        for key in stale:
+            _DETAIL_VIEW_CACHE.pop(key, None)
+        if stale:
+            _DETAIL_VIEW_CACHE_ORDER[:] = [key for key in _DETAIL_VIEW_CACHE_ORDER if key in _DETAIL_VIEW_CACHE]
+    return base
+
+
+def _cache_detail_view(signature: Any, item_id: str, value: dict[str, Any]) -> None:
+    key = (signature, item_id)
+    with _READ_VIEW_CACHE_LOCK:
+        _DETAIL_VIEW_CACHE[key] = value
+        if key in _DETAIL_VIEW_CACHE_ORDER:
+            _DETAIL_VIEW_CACHE_ORDER.remove(key)
+        _DETAIL_VIEW_CACHE_ORDER.append(key)
+        while len(_DETAIL_VIEW_CACHE_ORDER) > _DETAIL_VIEW_CACHE_LIMIT:
+            expired = _DETAIL_VIEW_CACHE_ORDER.pop(0)
+            _DETAIL_VIEW_CACHE.pop(expired, None)
+
+
+def backlog_view(repo: str | Path = ".", *, q: str = "", status: str = "", limit: int = 500) -> dict[str, Any]:
+    base = _build_backlog_list_base(repo)
+    all_rows = list(base.get("all_rows") or [])
+    query = _clean(q).lower()
+    status_filter = _clean(status).upper()
+
+    def matches(row: Mapping[str, Any]) -> bool:
+        if query and query not in _clean(f"{row.get('title')} {row.get('description')}").lower():
+            return False
+        if not status_filter:
+            return True
+        if status_filter == "NEW_DATA":
+            return bool(row.get("has_new_data"))
+        if status_filter == "TRACKING":
+            return _clean(row.get("auto_status")).upper() in {"TRACKING", "TRACKING_NEW", "TRACKING_DUE"}
+        return _clean(row.get("auto_status")).upper() == status_filter
+
+    rows = [row for row in all_rows if matches(row)]
+    return {
+        "engine_version": base.get("engine_version") or ENGINE_VERSION,
+        "status": "OK",
+        "total": len(all_rows),
+        "filtered": len(rows),
+        "counts": dict(base.get("counts") or {}),
+        "tracking_summary": dict(base.get("tracking_summary") or {}),
+        "founder_inbox": list(base.get("founder_inbox") or []),
+        "founder_attention_total": int(base.get("founder_attention_total") or 0),
+        "items": rows[: max(1, min(int(limit or 1000), 2000))],
+        "worker": dict(base.get("worker") or {}),
+        "automation": dict(base.get("automation") or {}),
+        "legacy_archive_summary": dict(base.get("legacy_archive_summary") or {}),
+        "import_warnings": list(base.get("import_warnings") or []),
+        "market_truth_writes": 0,
+        "truth_boundary": base.get("truth_boundary") or TRUTH_BOUNDARY,
     }
 
 
 def backlog_detail(repo: str | Path, item_id: str) -> dict[str, Any]:
-    store = load_store(repo, repair_worker=False)
+    signature = _store_signature(repo)
+    key = (signature, item_id)
+    with _READ_VIEW_CACHE_LOCK:
+        cached = _DETAIL_VIEW_CACHE.get(key)
+        if isinstance(cached, dict):
+            return copy.deepcopy(cached)
+
+    store = _load_store_readonly(repo)
     item = (store.get("items") or {}).get(item_id) if isinstance(store.get("items"), Mapping) else None
     if not isinstance(item, Mapping):
-        return {"status": "NOT_FOUND", "id": item_id, "market_truth_writes": 0, "truth_boundary": TRUTH_BOUNDARY}
-    return {"status": "OK", "item": _item_for_view(item, include_history=True, include_handoff=True), "market_truth_writes": 0, "truth_boundary": TRUTH_BOUNDARY}
+        result = {
+            "status": "NOT_FOUND",
+            "id": item_id,
+            "market_truth_writes": 0,
+            "truth_boundary": store.get("truth_boundary") or TRUTH_BOUNDARY,
+        }
+        _cache_detail_view(signature, item_id, result)
+        return result
+
+    result = {
+        "status": "OK",
+        "item": _item_for_view(item, include_history=True, include_handoff=True),
+        "market_truth_writes": 0,
+        "truth_boundary": store.get("truth_boundary") or TRUTH_BOUNDARY,
+    }
+    _cache_detail_view(signature, item_id, result)
+    return copy.deepcopy(result)
 
 
 def _format_tracking_cards(rows: Sequence[Mapping[str, Any]], *, limit: int) -> list[str]:

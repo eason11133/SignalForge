@@ -178,10 +178,10 @@ function TraceRow({ row }: { row: ResearchHistoryEntry }) {
 }
 
 
-const WORKSPACE_LIST_CACHE_KEY = "signalforge:research-backlog:v254:list";
-const WORKSPACE_SELECTED_KEY = "signalforge:research-backlog:v254:selected";
-const WORKSPACE_DETAIL_PREFIX = "signalforge:research-backlog:v254:detail:";
-const WORKSPACE_DETAIL_INDEX_KEY = "signalforge:research-backlog:v254:detail-index";
+const WORKSPACE_LIST_CACHE_KEY = "signalforge:research-backlog:v256-dockerless:list";
+const WORKSPACE_SELECTED_KEY = "signalforge:research-backlog:v256-dockerless:selected";
+const WORKSPACE_DETAIL_PREFIX = "signalforge:research-backlog:v256-dockerless:detail:";
+const WORKSPACE_DETAIL_INDEX_KEY = "signalforge:research-backlog:v256-dockerless:detail-index";
 const DETAIL_CACHE_LIMIT = 6;
 const ACTIVE_REFRESH_MS = 12_000;
 const IDLE_REFRESH_MS = 30_000;
@@ -367,7 +367,9 @@ export default function ResearchBacklog() {
       else if (current && !items.some((item) => item.id === current) && items.length) setSelectedId(items[0].id);
       return reconciled;
     } catch (err) {
-      if (!silent && seq === listRequestSeq.current) setError(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      const cachedCount = (readListSnapshot().items || []).length;
+      if (seq === listRequestSeq.current && (!silent || cachedCount === 0)) setError(message);
       return null;
     } finally {
       if (!silent && seq === listRequestSeq.current) setBusy("");
