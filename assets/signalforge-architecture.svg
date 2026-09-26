@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <style>
+      .bg { fill:#f7f8f6; }
+      .main { fill:#eef5fb; stroke:#9bbbd3; stroke-width:2; }
+      .memory { fill:#f1f0f7; stroke:#aaa8c3; stroke-width:2; }
+      .neutral { fill:#f2f2ef; stroke:#b8b8b0; stroke-width:2; }
+      .text { font-family: Inter, "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif; fill:#20252b; font-size:26px; font-weight:600; text-anchor:middle; dominant-baseline:middle; }
+      .small { font-family: Inter, "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif; fill:#4b535b; font-size:22px; font-weight:600; text-anchor:middle; dominant-baseline:middle; }
+      .arrow { stroke:#69747e; stroke-width:3; fill:none; marker-end:url(#arrow); }
+      .dash { stroke:#8b8f92; stroke-width:2.5; stroke-dasharray:9 8; fill:none; marker-end:url(#arrowGray); }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#69747e"/>
+    </marker>
+    <marker id="arrowGray" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#8b8f92"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1600" height="900"/>
+
+  <rect class="main" x="95" y="110" rx="18" ry="18" width="250" height="100"/>
+  <text class="text" x="220" y="160">研究方向</text>
+
+  <rect class="main" x="430" y="110" rx="18" ry="18" width="250" height="100"/>
+  <text class="text" x="555" y="160">多來源搜尋</text>
+
+  <rect class="main" x="765" y="110" rx="18" ry="18" width="250" height="100"/>
+  <text class="text" x="890" y="160">相關性判斷</text>
+
+  <rect class="main" x="1100" y="110" rx="18" ry="18" width="250" height="100"/>
+  <text class="text" x="1225" y="160">去重與分類</text>
+
+  <path class="arrow" d="M345 160 H430"/>
+  <path class="arrow" d="M680 160 H765"/>
+  <path class="arrow" d="M1015 160 H1100"/>
+
+  <rect class="neutral" x="430" y="285" rx="16" ry="16" width="250" height="90"/>
+  <text class="small" x="555" y="330">來源失敗處理</text>
+  <path class="dash" d="M555 210 V285"/>
+
+  <rect class="memory" x="830" y="360" rx="18" ry="18" width="300" height="105"/>
+  <text class="text" x="980" y="412">Evidence Memory</text>
+
+  <rect class="memory" x="1170" y="360" rx="18" ry="18" width="330" height="105"/>
+  <text class="text" x="1335" y="398">Actor / Behavior</text>
+  <text class="text" x="1335" y="432">Tracking</text>
+
+  <path class="arrow" d="M1225 210 V292 H980 V360"/>
+  <path class="arrow" d="M1225 210 V292 H1335 V360"/>
+
+  <rect class="memory" x="930" y="560" rx="18" ry="18" width="470" height="110"/>
+  <text class="text" x="1165" y="600">Repeated Patterns</text>
+  <text class="text" x="1165" y="638">+ Window Delta</text>
+
+  <path class="arrow" d="M980 465 V515 H1165 V560"/>
+  <path class="arrow" d="M1335 465 V515 H1165 V560"/>
+
+  <rect class="main" x="610" y="735" rx="18" ry="18" width="390" height="105"/>
+  <text class="text" x="805" y="775">Traceable Research</text>
+  <text class="text" x="805" y="812">Context</text>
+
+  <rect class="neutral" x="1115" y="735" rx="18" ry="18" width="300" height="105"/>
+  <text class="text" x="1265" y="788">Founder / ChatGPT</text>
+
+  <path class="arrow" d="M1165 670 V700 H805 V735"/>
+  <path class="arrow" d="M1000 788 H1115"/>
+</svg>
