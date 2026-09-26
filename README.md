@@ -1,126 +1,216 @@
 # SignalForge
 
-### 把 AI 討論出的產品想法，轉成可追蹤、可驗證的市場研究紀錄
+**持續市場研究與行為情報系統**
 
-我在和 AI 討論產品／創業方向時，發現真正麻煩的不是「想不到 idea」，而是每個 idea 後面都有大量分散的論壇、產品、評論、GitHub、文章與研究資料，而且每次對話都很容易重新搜尋、失去來源或混入無關內容。因此我做了 SignalForge，讓系統負責持續蒐集與保存 evidence，再把判斷留給人與 AI。
+SignalForge 是我為了長期研究產品方向與真實使用者行為而做的系統。它不替人下「這個市場成立／不成立」的結論，而是持續從公開來源搜尋、判斷相關性、去重、分類、保存並追蹤 evidence，再把可追溯的 context 交給 Founder / ChatGPT 做後續分析與決策。
 
 > **SignalForge = Search + Relevance + Dedup + Categorize + Track + Preserve**  
-> **ChatGPT / Human = Research + Analysis + Judgment + Next Step**
+> **Founder / ChatGPT = Research + Analysis + Judgment + Next Step**
 
-**This repository contains the full source code of SignalForge, with secrets, credentials, runtime data, caches and private data excluded.** 完整度與排除規則可由 [Full Source Manifest](FULL_SOURCE_MANIFEST.md) 稽核。
+目前本機研究工作區已累積 **203 個研究方向**，並持續保存材料、來源、行為、workaround、產品提及、公開人物與時間變化。
 
-SignalForge 是我持續開發的 research infrastructure / software project，不是「AI 自動預測成功商機」的系統。**Relevance 不等於 validation；search failed 也不等於市場不存在。**
+---
 
-## 我遇到的問題
+## 為什麼做 SignalForge
 
-- 同一個 idea 每次開新對話都可能從頭搜尋，研究成本無法累積。
-- 公開資料分散在 discussion、GitHub、general web、reviews、products、articles / research。
-- 長句直接做 keyword search，容易漏掉真正使用者會採用的說法。
-- 搜到相同字詞，不代表它回答了同一個問題。
-- 同一事件的轉貼或同一 URL 的不同形式，會製造「很多 evidence」的錯覺。
-- browser refresh 或切頁不應重跑 research，也不應丟失進度。
-- timeout、blocked 或 0 results，都不能被誤譯為「沒有需求」。
+一開始我想做的是「讓 AI 自動找出值得做的商機」。
 
-## SignalForge 怎麼解
+真正跑過大量資料後，我遇到的問題反而不是 AI 不會分析，而是它很容易把不確定的東西分析得像真的，例如：
 
-1. **Query decomposition**：把母方向拆成 actor、platform、failure、workaround、source facets。
-2. **Multi-source research**：從 public discussions、GitHub、general web、reviews、products、articles / research 收集候選材料。
-3. **Relevance filtering**：把 exact、related、counterevidence 與 noise 分開。
-4. **Deduplication**：正規化 URL、比對內容與事件 identity，避免重複計數。
-5. **Categorization**：整理成 human conversation、solution、published material、counterevidence 等研究 lane。
-6. **Persistent research**：backend 用 `run_id` 保存工作狀態；UI 只 reconnect / read status。
-7. **Research history**：保留 `first_seen`、source、URL、search trace、`seen_count` 等欄位。
-8. **Human/AI handoff**：SignalForge 整理材料，最後比較、判斷與下一步交給 ChatGPT / Founder。
+- 同一來源被當成多份獨立 evidence
+- 關鍵字相似被誤當成需求成立
+- 搜尋失敗被誤解成「市場不存在」
+- evidence 綁錯 actor / context
+- 一次性的搜尋無法累積成長期市場記憶
+
+因此 SignalForge 後來把重點從「自動判斷商機」改成 **evidence-first research infrastructure**。
+
+核心原則是：
+
+- relevance 不等於 validation
+- search failed 不等於 no market
+- repeated behavior 可以是 evidence，但不是 verdict
+- counterevidence 必須和 supporting evidence 一起保存
+- tracking system 不得自行寫入市場成立／不成立的結論
+
+目前系統維持：
+
+`market_truth_writes = 0`
+
+---
+
+## 現在 SignalForge 在做什麼
+
+### 1. Research Directions
+
+使用者先建立想研究的產品方向、問題或市場假設。
+
+系統保存方向本身，不要求先證明它是「好機會」。
+
+### 2. Multi-source Search
+
+依研究方向拆出 actor、workflow、workaround、product、switching、category language 等查詢角度，從多種公開來源取得材料，例如：
+
+- public discussions
+- Reddit / forums
+- GitHub / Hacker News
+- general web
+- products / competitors
+- articles / research
+- B2B / job / procurement signals
+
+### 3. Relevance + Dedup
+
+搜尋結果不會直接被視為市場證據。
+
+SignalForge 會先做：
+
+- relevance classification
+- URL normalization
+- duplicate / same-event detection
+- source-family categorization
+- provenance preservation
+
+### 4. Behavior Tracking
+
+市場需求不一定會以「抱怨」出現。
+
+SignalForge 也會追蹤：
+
+- recurring workflows
+- manual workarounds
+- product mentions
+- switching behavior
+- repeated actors
+- category language
+
+### 5. Actor Continuity
+
+針對公開來源中的 actor，系統可保存：
+
+- platform / handle
+- first seen / last seen
+- observation count
+- workflows
+- workarounds
+- product mentions
+- public contact path
+
+identity matching 採保守策略，不做私人身份解析。
+
+### 6. Repeated Patterns + Window Delta
+
+同一研究方向內，系統會觀察跨 actor 重複出現的 pattern。
+
+目前 repeated pattern 預設需要至少 **3 個 independent actors** 才浮出。
+
+同時比較：
+
+- last 7d vs previous 7d
+- last 30d vs previous 30d
+
+這些數字只描述變化，不直接等同市場成長或需求成立。
+
+---
 
 ## 核心流程
 
 ```mermaid
-flowchart TD
-    A[Idea or problem direction] --> B[Query decomposition and expansion]
-    B --> C[Multiple public sources]
-    C --> D[Relevance filtering]
-    D --> E[Deduplication and categorization]
-    E --> F[Persistent research history]
-    F --> G[ChatGPT and Founder handoff]
-    G --> H[Analysis, judgment, next step]
-```
-
-```mermaid
 flowchart LR
-    UI[React Research UI] --> API[FastAPI routes]
-    API --> RUNS[Persistent run registry]
-    API --> ENGINE[Research engines]
-    ENGINE --> QUERY[Query and source planning]
-    QUERY --> SOURCES[Public source adapters]
-    SOURCES --> QUALITY[Relevance, dedup, categorization]
-    QUALITY --> HISTORY[Research record and history]
-    HISTORY --> UI
-    HISTORY --> HANDOFF[ChatGPT or Founder]
+    A[Research Direction] --> B[Multi-source Search]
+    B --> C[Relevance]
+    C --> D[Dedup + Categorize]
+    D --> E[Evidence Memory]
+    D --> F[Actor + Behavior Tracking]
+    E --> G[Repeated Patterns + Window Delta]
+    F --> G
+    G --> H[Traceable Research Context]
+    H --> I[Founder / ChatGPT]
 ```
 
-更完整的元件責任、資料流與 failure semantics 請見 [Architecture](docs/ARCHITECTURE.md)；研究判讀原則見 [Research Method](docs/RESEARCH_METHOD.md)。
+---
 
-## 工程重點
+## 架構重點
 
-### Query decomposition
+### Persistent Research
 
-使用者描述常混合角色、情境、痛點與解法。系統產生多個有辨識力的 facets，避免把整段文字直接塞進單一搜尋框。
+Browser 不是 research job owner。
 
-### Relevance filtering
+單一方向研究使用 persisted run state：
 
-retrieval 與 relevance 是兩層工作。像遊戲 issue 或不相干的 GitHub issue，可能剛好包含 URL、GPT 或 upload 等字樣；SignalForge 不讓字面命中直接升格為 market evidence。
+- duplicate click reuse active run
+- browser refresh 可 reconnect
+- navigation 不會重啟同一份研究
+- global tracking 暫停時，單一方向仍可手動研究
 
-### Deduplication
+### Dockerless Local Mode
 
-相同文章被轉貼到不同平台，不能算成多個獨立事件。系統結合 URL canonicalization、內容 fingerprint 與 identity 判定，並以 `seen_count` 保存再次觀察的歷史。
+SignalForge 現在預設可直接使用本機 `.radar_runtime` 的 persistent research state。
 
-### Persistent runs
+**Docker / PostgreSQL / Redis 不再是開啟 Research Workspace 的必要條件。**
 
-research run 屬於 backend，不屬於 browser component。`POST start` 建立或重用 `run_id`；refresh 後 UI 重新讀取同一 run，避免重複啟動昂貴工作。
+PostgreSQL / Redis 保留為 legacy / optional infrastructure。
 
-### Failure semantics
+### Read-only Dashboard Path
 
-- `SEARCH FAILED != NO MARKET SIGNAL`
-- `0 results != no demand`
-- `source blocked != no evidence exists`
+Dashboard 的 list / detail GET 使用 read-only fast path：
 
-transport failure、coverage 與 evidence conclusion 被分開保存。詳見 [Limitations](docs/LIMITATIONS.md)。
+- 不因為開頁面而跑 migration
+- 不因 GET 重寫 canonical research store
+- list / detail 使用 cache
+- canonical research state 仍由 mutation / research path 管理
 
-## 實際案例
+---
 
-研究假設：**AI users struggle to give public links to their AI and keep the conversation going.**
+## Tech Stack
 
-ChatGPT、Claude 等 AI 在讀 YouTube、TikTok、Instagram、Reddit、X、GitHub、一般網頁或 PDF 的公開連結時，可能遇到 access、extraction 或 context 問題。使用者因而採用 copy-paste、transcript、download/upload、browser extension、scraper、MCP 或換模型等 workaround。
+**Backend**
 
-SignalForge 對此方向會拆解 facets、保存來源與 search trace、過濾表面關鍵字命中、合併重複轉貼，並把 exact、related、counterevidence 與 search failure 分開交接。**這只是 research hypothesis，不是已驗證的市場結論。**
+- Python
+- FastAPI
+- file-backed persistent research state
+- optional PostgreSQL / Redis legacy stack
+
+**Frontend**
+
+- React
+- TypeScript
+- Vite
+
+**Research / Data**
+
+- multi-source adapters
+- relevance filtering
+- deduplication
+- persistent history
+- actor continuity
+- behavior extraction
+- repeated-pattern detection
+- rolling-window deltas
+
+---
 
 ## Quick Start
-
-### Prerequisites
-
-- Python 3.11+
-- Node.js 20+
-- PostgreSQL 與 Redis（可使用 `docker-compose.yml`）
-- 外部來源所需 API key；未設定時，對應 adapter 會呈現 unavailable / pending credential，不應被解讀成 no demand
-
-將安全範本複製為本機設定後再填入自己的值；不要 commit `.env`：
-
-```bash
-cp .env.example .env
-```
 
 ### Backend
 
 ```bash
-python -m venv .venv
-# Windows: .venv\Scripts\activate
-# macOS/Linux: source .venv/bin/activate
+python -m venv venv
+
+# Windows
+venv\Scripts\activate
+
 pip install -r requirements.txt
-docker compose up -d postgres redis
-uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+python -m uvicorn api.main:app --host 0.0.0.0 --port 8000
 ```
 
-Backend entrypoint：`api/main.py`（FastAPI app：`api.main:app`）。資料庫初始化可執行 `python init_db.py`。
+預設為 local mode，不需要先啟動 Docker。
+
+若要使用 legacy PostgreSQL stack，可自行設定：
+
+```bash
+SIGNALFORGE_STORAGE_MODE=postgres
+```
 
 ### Frontend
 
@@ -130,49 +220,93 @@ npm install
 npm run dev
 ```
 
-Frontend entrypoint：`dashboard/src/main.tsx`；Vite 設定在 `dashboard/vite.config.ts`。
+預設開啟：
 
-### Representative checks
+`http://localhost:5173/`
 
-本 repo 保留完整的 root-level smoke / acceptance / regression scripts，例如：
-
-```bash
-python run_signalforge_tracking_research_persistence_v2_5_3_smoke.py
-python run_signalforge_r8_idea_research_recall_fix5_acceptance.py
-python run_signalforge_research_backlog_v1_acceptance.py
-```
-
-需要 live API 或已啟動 backend 的測試，會在檔名或輸出中標示；執行前請先設定相應 prerequisite。完整 demo 路徑見 [Demo Guide](docs/DEMO.md)。
+---
 
 ## Repository Structure
 
-以下依實際 export 後的 root directories 整理：
-
 ```text
 SignalForge/
-├── agents/          # agent definitions and analysis workers
-├── api/             # FastAPI app, routes, schemas and persistence middleware
-├── benchmarks/      # source-controlled benchmark inputs
-├── config/          # safe configuration and source registries
-├── dashboard/       # React + TypeScript + Vite frontend
-├── database/        # database connection and models
-├── docs/            # architecture, research contracts, migrations and demo docs
-├── processors/      # research, relevance, dedup, evidence and decision pipelines
-├── scheduler/       # scheduled jobs
-├── scrapers/        # public-source collectors and adapters
-├── simulation/      # simulation support
-├── *.py             # backend entrypoints, run scripts, smoke and regression tests
-├── .env.example     # credential names only; no real values
-├── docker-compose.yml
+├── api/            # FastAPI routes and runtime boundaries
+├── processors/     # research, relevance, tracking and behavior logic
+├── dashboard/      # React + TypeScript research workspace
+├── scrapers/       # public-source collectors and adapters
+├── config/         # configuration and source policies
+├── database/       # optional legacy database layer
+├── scheduler/      # scheduled jobs
+├── benchmarks/     # regression / benchmark fixtures
+├── docs/           # architecture, demo and limitations
 ├── requirements.txt
-├── FULL_SOURCE_MANIFEST.md
 └── README.md
 ```
 
-Frontend dependency/build files包括 `dashboard/package.json`、`dashboard/package-lock.json`、TypeScript config、Vite config 與完整 `dashboard/src/`。Python dependencies 位於 `requirements.txt` 與 `requirements-signalforge-chatgpt.txt`。
+root 仍保留大量歷史 regression / audit scripts，因為 SignalForge 是從多輪實驗逐步演進而來；目前主要產品路徑集中在 `api/`、`processors/` 與 `dashboard/`。
 
-## Current Status / Limitations
+---
 
-本 repository 包含 production working tree 中的完整 current source，包括尚未提交但屬於實際系統的 source files；不包含 secrets、credentials、runtime database、cache、logs、私人資料、rollback backups、installer/export packages 或 generated result bundles。
+## Representative Checks
 
-公開原始碼能證明系統已落到 backend、frontend、source adapters、research logic、persistence、tracking 與 tests，但不代表所有外部來源隨時可連線，也不宣稱使用者數、營收、準確率或已驗證市場成果。完整限制見 [Limitations](docs/LIMITATIONS.md)。
+```bash
+python run_signalforge_behavior_tracking_v1_regression.py
+python run_signalforge_tracking_research_persistence_v2_5_3_smoke.py
+python run_signalforge_dockerless_local_mode_regression.py
+python run_signalforge_dockerless_readpath_fix_v1_regression.py
+```
+
+測試重點包括：
+
+- persistence
+- single-item research
+- actor continuity
+- repeated pattern threshold
+- rolling windows
+- Dockerless local mode
+- read-only list/detail path
+- `market_truth_writes = 0`
+
+---
+
+## 專案演進
+
+SignalForge 的方向不是一開始就正確。
+
+```text
+自動商機評分
+    ↓
+Evidence-first research
+    ↓
+Continuous Tracking
+    ↓
+Behavior + Trend Intelligence
+```
+
+這個專案最重要的學習不是「讓 AI 更會選商機」，而是：
+
+> **先把 evidence、來源、行為與時間變化保存好，再讓人與 AI 做判斷。**
+
+---
+
+## Limitations
+
+SignalForge 是 research infrastructure，不是市場預測器。
+
+- 公開來源 coverage 永遠不完整
+- relevance 可能有 false positive / false negative
+- repeated mentions 不代表 willingness to pay
+- product mentions 不代表 brand vacuum
+- source failure 不代表 no demand
+- behavior tracking 不代表因果關係
+- 系統不宣稱能預測商業成功
+
+詳細說明見 [Limitations](docs/LIMITATIONS.md)。
+
+---
+
+## More
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [Demo Guide](docs/DEMO.md)
+- [Limitations](docs/LIMITATIONS.md)
