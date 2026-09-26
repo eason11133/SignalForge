@@ -1,54 +1,108 @@
 # Demo Guide
 
-## 審查者的 5 分鐘路徑
+## 5-minute reviewer path
 
-1. 從 [README](../README.md) 的定位與核心流程開始。
-2. 閱讀 [Architecture](ARCHITECTURE.md) 的 run lifecycle 與 failure semantics。
-3. 查看 `api/signalforge_research_persistence_v253.py`，確認 `run_id`、idempotency 與持久化不是只有概念。
-4. 查看 `processors/signalforge_founder_idea_loop.py` 與 `processors/signalforge_research_backlog.py`，搜尋 `relevance`、`dedup`、`first_seen`、`seen_count`。
-5. 執行兩個不需真實 credential 的代表性測試。
+### 1. Open Research Workspace
 
-## Persistence demo
+The main workspace should show the persisted research directions and current tracking summary.
 
-在 repository root 執行：
+Current local dataset used during development contains 203 research directions.
+
+### 2. Open one direction
+
+A direction detail page shows:
+
+- hypothesis / description
+- material statistics
+- source families
+- latest research
+- history
+- actor observations
+- behavior windows
+- repeated patterns
+
+### 3. Verify the evidence-first boundary
+
+The UI describes observed evidence and behavior.
+
+It does not automatically output a market verdict.
+
+### 4. Run one direction manually
+
+Use the single-direction research action.
+
+Expected behavior:
+
+- creates or reuses one persisted run
+- does not start all directions
+- remains usable while global auto tracking is paused
+- can reconnect after navigation / refresh
+
+### 5. Review behavior intelligence
+
+For directions with enough current observations, inspect:
+
+- public actors
+- workflows
+- workarounds
+- repeated patterns
+- 7d / 30d deltas
+
+These are descriptive signals only.
+
+---
+
+## Local startup
+
+### Backend
 
 ```bash
+python -m uvicorn api.main:app --host 0.0.0.0 --port 8000
+```
+
+Docker is not required for the default Research Workspace.
+
+### Frontend
+
+```bash
+cd dashboard
+npm run dev
+```
+
+Open:
+
+`http://localhost:5173/`
+
+---
+
+## Representative regressions
+
+```bash
+python run_signalforge_behavior_tracking_v1_regression.py
 python run_signalforge_tracking_research_persistence_v2_5_3_smoke.py
+python run_signalforge_dockerless_local_mode_regression.py
+python run_signalforge_dockerless_readpath_fix_v1_regression.py
 ```
 
-測試會使用 temporary directory，不讀寫 production runtime。預期驗證：
+Expected themes:
 
-- start request 在 canonical work 完成前回傳；
-- 同一方向的 active run 具有 idempotency；
-- canonical start 不會重複呼叫；
-- UI 再次查詢可用同一 `run_id` 讀回狀態；
-- run registry 確實落盤；
-- research infrastructure 不會寫入 market truth。
+- actor state persists
+- patterns require independent actors
+- rolling windows exist
+- single-item run persists
+- Dockerless mode starts without PostgreSQL
+- list/detail GET stays read-only
+- market truth remains untouched
 
-## Relevance regression demo
+---
 
-```bash
-python run_signalforge_r8_idea_research_recall_fix5_acceptance.py
-```
+## Demo boundary
 
-此測試使用固定 fixture 與假的 transport，不呼叫外部網路。它檢查：
+This demo proves the research workflow and engineering boundaries.
 
-- discussion comment 與 root post 的不同語意；
-- exact / related / counterevidence 邊界；
-- optional source failure 仍顯示為 gap；
-- 某來源已失敗時，不會對每個 query facet 反覆撞同一來源。
+It does **not** prove:
 
-## UI walkthrough（完整應用環境）
-
-1. 建立方向：`AI users struggle to give public links to their AI and keep the conversation going`。
-2. 檢視 actor、platform、failure、workaround 與 source facets。
-3. 啟動 research 並記錄畫面上的 `run_id`。
-4. refresh browser，確認 UI reconnect 到原 run。
-5. 比較 human discussion、solution、published material、counterevidence 與 gap。
-6. 打開其中一筆 record，核對 source URL、search trace、first seen 與 seen count。
-7. 確認 blocked / timeout source 沒有被顯示為「no demand」。
-8. 把 brief 交給 ChatGPT / Founder，產生人工可審核的下一步驗證計畫。
-
-## Demo 的誠實邊界
-
-此案例只展示研究 pipeline 與資料可信度設計。它不證明該 hypothesis 已有市場、有人願意付費，或 SignalForge 能預測商業成功。
+- a specific market is validated
+- willingness to pay exists
+- revenue exists
+- SignalForge can predict successful products
