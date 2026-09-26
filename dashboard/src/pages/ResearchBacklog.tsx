@@ -57,7 +57,7 @@ function statusMeta(status?: string, hasNewData = false) {
   if (raw === "SOURCE_LIMITED") return { label: "來源受限", cls: "border-warning/30 bg-bg-warning text-warning" };
   if (raw === "TRACKING_NEW") return { label: "待首次追蹤", cls: "border-border-secondary bg-bg-secondary text-text-secondary" };
   if (raw === "TRACKING_DUE") return { label: "待更新", cls: "border-info/30 bg-bg-info text-info" };
-  if (hasNewData) return { label: "有新資料", cls: "border-success/30 bg-bg-success text-txt-success" };
+  if (hasNewData) return { label: "有新證據", cls: "border-success/30 bg-bg-success text-txt-success" };
   return { label: "自動追蹤", cls: "border-success/30 bg-bg-success text-txt-success" };
 }
 
@@ -686,17 +686,22 @@ export default function ResearchBacklog() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 text-xs font-semibold text-info"><Globe2 size={15} /> SignalForge</div>
-              <h1 className="mt-1.5 text-xl font-semibold tracking-tight text-text-primary">商機自動追蹤</h1>
+              <h1 className="mt-1.5 text-xl font-semibold tracking-tight text-text-primary">持續市場研究</h1>
               <p className="mt-1.5 max-w-3xl text-xs leading-5 text-text-secondary">
-                SignalForge 只負責持續找跟 idea 有關的公開資料、相關產品與原始來源。商機研究、比較與判斷交給 ChatGPT / Founder。
+                SignalForge 持續搜尋、判斷相關性、去重、分類與保存公開證據，追蹤人物、workaround、產品與行為隨時間的變化；市場分析與最後判斷交給 Founder / ChatGPT。
               </p>
+              <div className="mt-2 flex flex-wrap gap-1.5 text-[9px] font-semibold text-text-tertiary">
+                <span className="rounded-full border border-border-secondary bg-bg-secondary px-2.5 py-1">公開來源證據</span>
+                <span className="rounded-full border border-border-secondary bg-bg-secondary px-2.5 py-1">持續追蹤</span>
+                <span className="rounded-full border border-border-secondary bg-bg-secondary px-2.5 py-1">不自動下市場結論</span>
+              </div>
             </div>
             <div className="flex shrink-0 flex-wrap gap-1.5">
               <button type="button" onClick={() => void revalidateWorkspace(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-border-secondary bg-bg-secondary px-3 py-2 text-[11px] font-semibold text-text-secondary">
                 <RefreshCw size={13} className={busy === "refresh" ? "animate-spin" : ""} /> 重新整理
               </button>
               <button type="button" onClick={() => setShowAdd((value) => !value)} className="inline-flex items-center gap-1.5 rounded-lg border border-border-secondary bg-bg-secondary px-3 py-2 text-[11px] font-semibold text-text-secondary">
-                <Plus size={14} /> 加方向
+                <Plus size={14} /> 新增方向
               </button>
               <button type="button" onClick={() => void toggleTracking()} className="inline-flex items-center gap-1.5 rounded-lg bg-text-primary px-3 py-2 text-[11px] font-semibold text-bg-primary">
                 {paused ? <Play size={14} /> : <CirclePause size={14} />}全部方向自動追蹤：{paused ? "開始" : "暫停"}
@@ -706,18 +711,18 @@ export default function ResearchBacklog() {
 
           {showAdd ? (
             <div className="mt-5 grid gap-3 rounded-2xl border border-border-secondary bg-bg-secondary p-4 md:grid-cols-[1fr_1.6fr_auto]">
-              <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="商機 / idea 標題" className="rounded-xl border border-border-secondary bg-bg-primary px-3 py-2.5 text-xs outline-none focus:border-info/50" />
+              <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="研究方向標題" className="rounded-xl border border-border-secondary bg-bg-primary px-3 py-2.5 text-xs outline-none focus:border-info/50" />
               <textarea value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="誰、什麼情境、遇到什麼問題（可以很短）" className="min-h-[120px] max-h-[360px] resize-y rounded-xl border border-border-secondary bg-bg-primary px-3 py-2.5 text-xs leading-5 outline-none focus:border-info/50" />
-              <button type="button" disabled={!newTitle.trim() || busy === "add"} onClick={() => void addIdea()} className="rounded-xl bg-text-primary px-4 py-2.5 text-xs font-semibold text-bg-primary disabled:opacity-40">加入追蹤</button>
+              <button type="button" disabled={!newTitle.trim() || busy === "add"} onClick={() => void addIdea()} className="rounded-xl bg-text-primary px-4 py-2.5 text-xs font-semibold text-bg-primary disabled:opacity-40">加入研究</button>
             </div>
           ) : null}
 
           <div className="mt-4 grid gap-2 grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
             {[
-              ["追蹤方向", n(summary.directions)],
+              ["研究方向", n(summary.directions)],
               ["搜尋中", n(summary.searching)],
-              ["有新資料", n(summary.directions_with_new_data)],
-              ["新資料", n(summary.new_materials)],
+              ["有新證據", n(summary.directions_with_new_data)],
+              ["新增證據", n(summary.new_materials)],
               ["新相關產品", n(summary.new_products)],
               ["來源受限", n(summary.source_limited)],
             ].map(([label, value]) => (
@@ -731,7 +736,7 @@ export default function ResearchBacklog() {
           <div className="mt-3 rounded-xl border border-border-secondary bg-bg-secondary px-3 py-2.5 text-[10px] leading-4 text-text-secondary">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <Activity size={13} className="text-info" />
-              <span className="font-semibold text-text-primary">自動追蹤：{paused ? "PAUSED" : String(worker.status || "IDLE")}</span>
+              <span className="font-semibold text-text-primary">追蹤狀態：{paused ? "PAUSED" : String(worker.status || "IDLE")}</span>
               <span>· {n(worker.active_count)} active</span>
               <span>· {n(worker.queued_jobs_estimate)} queued</span>
               <span>· concurrency {n(worker.max_concurrency) || 6}</span>
@@ -741,7 +746,7 @@ export default function ResearchBacklog() {
             </div>
             {activeNames.length ? <div className="mt-1 truncate text-text-tertiary">正在找：{activeNames.join("、")}</div> : null}
             <div className="mt-1 text-text-tertiary">來源面：Reddit / 實務社群 / 產品評論 / 支援論壇 / 相關產品 / 人工 workaround / 研究案例 / B2B 營運 / 職缺與 RFP + HN / GitHub / 一般網頁；資料不足時會自動針對缺口深挖。</div>
-            {worker.last_error ? <div className="mt-1 text-warning">{worker.last_error}</div> : null}
+            {worker.last_error && !/Previous API process stopped|in-flight searches were requeued/i.test(String(worker.last_error)) ? <div className="mt-1 text-warning">{worker.last_error}</div> : null}
           </div>
           {error ? <div className="mt-3 rounded-2xl border border-danger/30 bg-bg-danger p-3 text-xs text-danger">{error}</div> : null}
         </header>
@@ -755,7 +760,7 @@ export default function ResearchBacklog() {
               </label>
               <select value={status} onChange={(e) => setStatus(e.target.value)} className="max-w-[92px] rounded-lg border border-border-secondary bg-bg-secondary px-2 text-[11px] text-text-secondary outline-none">
                 <option value="">全部</option>
-                <option value="NEW_DATA">有新資料</option>
+                <option value="NEW_DATA">有新證據</option>
                 <option value="TRACKING">自動追蹤</option>
                 <option value="SEARCHING">搜尋中</option>
                 <option value="SOURCE_LIMITED">來源受限</option>
@@ -819,7 +824,7 @@ export default function ResearchBacklog() {
                       ["相關產品", n(stats.products)],
                       ["文章 / 研究", n(stats.articles)],
                       ["技術資料", n(stats.technical)],
-                      ["尚未回報的新資料", n(stats.new_total)],
+                      ["尚未回報證據", n(stats.new_total)],
                     ].map(([label, value]) => (
                       <div key={String(label)} className="rounded-xl border border-border-secondary bg-bg-secondary p-2.5">
                         <div className="text-[9px] font-semibold text-text-tertiary">{label}</div>
@@ -835,7 +840,7 @@ export default function ResearchBacklog() {
                   </div>
                   {selected.tracking_family_stats && Object.keys(selected.tracking_family_stats).length ? (
                     <div className="mt-3 rounded-xl border border-border-secondary bg-bg-secondary p-3">
-                      <div className="text-[9px] font-semibold text-text-tertiary">目前資料來自哪些搜尋面</div>
+                      <div className="text-[9px] font-semibold text-text-tertiary">目前證據來源</div>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {Object.entries(selected.tracking_family_stats).slice(0, 10).map(([family, count]) => (
                           <span key={family} className="rounded-full border border-border-secondary bg-bg-primary px-2.5 py-1 text-[10px] text-text-secondary">
@@ -854,13 +859,13 @@ export default function ResearchBacklog() {
                 </section>
 
                 <section className="rounded-2xl border border-border-secondary bg-bg-primary p-4">
-                  <div className="flex items-center gap-2"><Activity size={15} className="text-info" /><h2 className="text-base font-semibold text-text-primary">最近變化</h2></div>
-                  <p className="mt-1 text-xs text-text-secondary">只描述最近觀察到的行為與來源變化，不代表需求強弱或商機評分。</p>
+                  <div className="flex items-center gap-2"><Activity size={15} className="text-info" /><h2 className="text-base font-semibold text-text-primary">行為與趨勢變化</h2></div>
+                  <p className="mt-1 text-xs text-text-secondary">只描述最近觀察到的人物、workaround、產品與行為變化，不代表需求強弱或市場成立。</p>
                   <div className="mt-3 grid gap-2 grid-cols-2 md:grid-cols-4">
                     {[
-                      ["近 7 天人物", n(behaviorCurrent.unique_actors), n(behaviorDelta.unique_actors)],
+                      ["近 7 天獨立人物", n(behaviorCurrent.unique_actors), n(behaviorDelta.unique_actors)],
                       ["workaround", n(behaviorCurrent.workaround_mentions), n(behaviorDelta.workaround_mentions)],
-                      ["重複人物", n(behaviorCurrent.repeat_actor_count), n(behaviorDelta.repeat_actor_count)],
+                      ["再次出現人物", n(behaviorCurrent.repeat_actor_count), n(behaviorDelta.repeat_actor_count)],
                       ["切換工具", n(behaviorCurrent.switching_mentions), n(behaviorDelta.switching_mentions)],
                     ].map(([label, value, delta]) => (
                       <div key={String(label)} className="rounded-xl border border-border-secondary bg-bg-secondary p-3">
@@ -872,46 +877,46 @@ export default function ResearchBacklog() {
 
                   <div className="mt-4 grid gap-3 xl:grid-cols-2">
                     <div className="rounded-xl border border-border-secondary bg-bg-secondary p-3">
-                      <div className="text-[10px] font-semibold text-text-primary">反覆出現</div>
+                      <div className="text-[10px] font-semibold text-text-primary">重複行為模式</div>
                       <div className="mt-2 space-y-2">
                         {repeatedPatterns.length ? repeatedPatterns.slice(0, 8).map((pattern) => (
                           <div key={pattern.pattern_id || pattern.canonical_label} className="rounded-lg bg-bg-primary p-2.5">
                             <div className="text-[11px] font-semibold text-text-primary">{pattern.canonical_label || "未命名 pattern"}</div>
-                            <div className="mt-1 text-[9px] text-text-tertiary">{n(pattern.independent_actor_count)} people · {n(pattern.material_count)} materials · {pattern.evidence_kind || "OTHER"}</div>
+                            <div className="mt-1 text-[9px] text-text-tertiary">{n(pattern.independent_actor_count)} 位獨立人物 · {n(pattern.material_count)} 筆材料 · {pattern.evidence_kind || "OTHER"}</div>
                             {pattern.example_evidence?.[0] ? <div className="mt-1 line-clamp-2 text-[10px] leading-4 text-text-secondary">{pattern.example_evidence[0]}</div> : null}
                           </div>
-                        )) : <div className="text-[10px] text-text-tertiary">目前沒有達到 3 位獨立人物支持的重複 pattern。</div>}
+                        )) : <div className="text-[10px] text-text-tertiary">目前沒有達到 3 位獨立人物支持的重複模式。</div>}
                       </div>
                     </div>
 
                     <div className="rounded-xl border border-border-secondary bg-bg-secondary p-3">
-                      <div className="text-[10px] font-semibold text-text-primary">人物</div>
+                      <div className="text-[10px] font-semibold text-text-primary">公開人物追蹤</div>
                       <div className="mt-2 space-y-2">
                         {actors.length ? actors.slice(0, 8).map((actor) => (
                           <div key={actor.actor_key || `${actor.platform}-${actor.handle}`} className="rounded-lg bg-bg-primary p-2.5">
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <div className="text-[11px] font-semibold text-text-primary">{actor.display_name || actor.handle || "public actor"}</div>
-                              <div className="text-[9px] text-text-tertiary">{actor.platform || "web"} · {n(actor.observation_count)} observations</div>
+                              <div className="text-[9px] text-text-tertiary">{actor.platform || "web"} · {n(actor.observation_count)} 次觀察</div>
                             </div>
-                            <div className="mt-1 text-[9px] text-text-tertiary">last seen {fmtTime(actor.last_seen_at)}</div>
+                            <div className="mt-1 text-[9px] text-text-tertiary">最後出現 {fmtTime(actor.last_seen_at)}</div>
                             {actor.workarounds?.length ? <div className="mt-1 text-[10px] text-text-secondary">workaround: {actor.workarounds.slice(0, 3).join(" / ")}</div> : null}
-                            {actor.public_contact_paths?.[0] ? <a href={actor.public_contact_paths[0]} target="_blank" rel="noreferrer" className="mt-1 block truncate text-[10px] text-info hover:underline">public contact/profile</a> : null}
+                            {actor.public_contact_paths?.[0] ? <a href={actor.public_contact_paths[0]} target="_blank" rel="noreferrer" className="mt-1 block truncate text-[10px] text-info hover:underline">公開頁面 / 聯絡路徑</a> : null}
                           </div>
-                        )) : <div className="text-[10px] text-text-tertiary">目前材料還沒有足夠的公開 actor identity 可安全合併。</div>}
+                        )) : <div className="text-[10px] text-text-tertiary">目前材料還沒有足夠的公開人物資訊可安全合併。</div>}
                       </div>
                     </div>
                   </div>
 
                   <div className="mt-3 rounded-xl border border-border-secondary bg-bg-secondary p-3">
-                    <div className="text-[10px] font-semibold text-text-primary">趨勢資料</div>
-                    {trendSnapshots.length ? <div className="mt-2 space-y-1 text-[10px] text-text-secondary">{trendSnapshots.slice(-6).reverse().map((row, index) => <div key={`${row.provider}-${row.term}-${index}`}>{row.term || "term"} · {row.value ?? "—"} · {row.provider || "provider"} · {row.period_start || ""}</div>)}</div> : <div className="mt-1 text-[10px] text-text-tertiary">尚未連接趨勢資料；SignalForge 仍會正常持續追蹤其他公開 evidence。</div>}
+                    <div className="text-[10px] font-semibold text-text-primary">外部趨勢資料</div>
+                    {trendSnapshots.length ? <div className="mt-2 space-y-1 text-[10px] text-text-secondary">{trendSnapshots.slice(-6).reverse().map((row, index) => <div key={`${row.provider}-${row.term}-${index}`}>{row.term || "term"} · {row.value ?? "—"} · {row.provider || "provider"} · {row.period_start || ""}</div>)}</div> : <div className="mt-1 text-[10px] text-text-tertiary">尚未連接外部趨勢資料；SignalForge 仍會正常追蹤其他公開證據。</div>}
                   </div>
                 </section>
 
                 {newMaterials.length ? (
                   <section className="rounded-2xl border border-success/25 bg-bg-primary p-4">
-                    <div className="flex items-center gap-2"><Sparkles size={15} className="text-txt-success" /><h2 className="text-base font-semibold text-text-primary">上次回報後新增</h2></div>
-                    <p className="mt-1 text-xs text-text-secondary">這裡只表示 SignalForge 新找到且跟 idea 有關，不代表它判斷這些資料很強。</p>
+                    <div className="flex items-center gap-2"><Sparkles size={15} className="text-txt-success" /><h2 className="text-base font-semibold text-text-primary">新增證據</h2></div>
+                    <p className="mt-1 text-xs text-text-secondary">這裡只表示 SignalForge 新找到且與研究方向相關，不代表它替市場下結論。</p>
                     <div className="mt-3 grid gap-2.5 lg:grid-cols-2 2xl:grid-cols-3">
                       {newMaterials.slice(0, 20).map(({ card, category }, index) => <MaterialCard key={`new-${card.url || card.title}-${index}`} card={card} category={category} />)}
                     </div>
@@ -933,21 +938,21 @@ export default function ResearchBacklog() {
                 ) : null}
 
                 <section className="rounded-2xl border border-border-secondary bg-bg-primary p-4">
-                  <div className="flex items-center gap-2"><Activity size={15} className="text-info" /><h2 className="text-base font-semibold text-text-primary">追蹤紀錄</h2></div>
-                  <p className="mt-1 text-xs text-text-secondary">只記錄 SignalForge 查了什麼、哪些來源成功、找到多少相關資料；不是商機評分。</p>
+                  <div className="flex items-center gap-2"><Activity size={15} className="text-info" /><h2 className="text-base font-semibold text-text-primary">研究軌跡</h2></div>
+                  <p className="mt-1 text-xs text-text-secondary">記錄 SignalForge 查了什麼、哪些來源成功、找到多少相關證據；不產生市場 verdict。</p>
                   <div className="mt-3 grid gap-2 lg:grid-cols-2 2xl:grid-cols-3">
-                    {(selected.history || []).length ? [...(selected.history || [])].reverse().slice(0, 12).map((row) => <TraceRow key={row.research_id || `${row.completed_at}`} row={row} />) : <div className="rounded-2xl bg-bg-secondary p-4 text-xs text-text-secondary">還沒有追蹤紀錄。</div>}
+                    {(selected.history || []).length ? [...(selected.history || [])].reverse().slice(0, 12).map((row) => <TraceRow key={row.research_id || `${row.completed_at}`} row={row} />) : <div className="rounded-2xl bg-bg-secondary p-4 text-xs text-text-secondary">還沒有研究軌跡。</div>}
                   </div>
                 </section>
 
                 <section className="rounded-2xl border border-border-secondary bg-bg-primary p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <h2 className="text-base font-semibold text-text-primary">給 ChatGPT 分析</h2>
-                      <p className="mt-1 text-xs leading-5 text-text-secondary">這包會帶上相關產品、討論、文章／研究、技術資料與原始連結。複製成功後，這一批資料會被標成已回報；之後新找到的內容會重新亮起。</p>
+                      <h2 className="text-base font-semibold text-text-primary">研究資料交接</h2>
+                      <p className="mt-1 text-xs leading-5 text-text-secondary">把相關產品、討論、文章／研究、技術資料與原始連結整理成可追溯 context，交給 Founder / ChatGPT 做後續分析。</p>
                     </div>
                     <button type="button" onClick={() => void copyHandoff()} className="inline-flex items-center gap-1.5 rounded-lg bg-text-primary px-3 py-2 text-[11px] font-semibold text-bg-primary">
-                      {copyState === "copied" ? <Check size={14} /> : <Copy size={14} />} {copyState === "copied" ? "已複製" : "複製完整資料包"}
+                      {copyState === "copied" ? <Check size={14} /> : <Copy size={14} />} {copyState === "copied" ? "已複製" : "複製研究資料包"}
                     </button>
                   </div>
                   <textarea readOnly value={selected.handoff || ""} rows={16} onFocus={(e) => e.currentTarget.select()} className="mt-3 w-full resize-y rounded-xl border border-border-secondary bg-bg-secondary p-3 font-mono text-[10px] leading-4 text-text-primary outline-none focus:border-info/50" />
