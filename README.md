@@ -115,18 +115,7 @@ identity matching 採保守策略，不做私人身份解析。
 
 ## 核心流程
 
-```mermaid
-flowchart LR
-    A[Research Direction] --> B[Multi-source Search]
-    B --> C[Relevance]
-    C --> D[Dedup + Categorize]
-    D --> E[Evidence Memory]
-    D --> F[Actor + Behavior Tracking]
-    E --> G[Repeated Patterns + Window Delta]
-    F --> G
-    G --> H[Traceable Research Context]
-    H --> I[Founder / ChatGPT]
-```
+![SignalForge architecture](assets/signalforge-architecture.svg)
 
 ---
 
