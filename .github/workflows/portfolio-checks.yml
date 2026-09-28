@@ -1,0 +1,87 @@
+name: Portfolio checks
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SIGNALFORGE_STORAGE_MODE: local
+      PYTHONUTF8: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Compile current entrypoints
+        run: |
+          python -m py_compile api/main.py
+          python -m py_compile processors/signalforge_research_backlog.py
+          python -m py_compile processors/signalforge_behavior_tracking.py
+          python -m py_compile run_signalforge_runtime_worker.py
+
+      - name: Behavior tracking regression
+        run: python run_signalforge_behavior_tracking_v1_regression.py
+
+      - name: Persistent research smoke
+        run: python run_signalforge_tracking_research_persistence_v2_5_3_smoke.py
+
+      - name: Dockerless startup contract
+        run: python run_signalforge_dockerless_local_mode_regression.py
+
+      - name: Single-item persistence regression
+        run: python run_signalforge_single_item_persistence_regression.py
+
+      - name: Brain v2 static acceptance
+        run: python run_signalforge_brain_v2_acceptance.py --static-only
+
+      - name: Start Dockerless API and check health
+        shell: bash
+        run: |
+          python -m uvicorn api.main:app --host 127.0.0.1 --port 8000 > /tmp/signalforge-api.log 2>&1 &
+          API_PID=$!
+          trap 'kill $API_PID || true' EXIT
+          python - <<'PY'
+          import json, time, urllib.request
+          last = None
+          for _ in range(30):
+              try:
+                  with urllib.request.urlopen("http://127.0.0.1:8000/api/health", timeout=2) as r:
+                      body = json.load(r)
+                  assert body.get("status") == "ok", body
+                  assert body.get("storage_mode") == "local", body
+                  assert body.get("signalforge_core_ready") is True, body
+                  assert body.get("docker_required") is False, body
+                  print(json.dumps(body, ensure_ascii=False))
+                  break
+              except Exception as exc:
+                  last = exc
+                  time.sleep(1)
+          else:
+              raise SystemExit(f"API startup health check failed: {last}")
+          PY
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Frontend production build
+        working-directory: dashboard
+        run: |
+          npm ci
+          npm run build

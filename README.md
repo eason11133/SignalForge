@@ -219,20 +219,25 @@ npm run dev
 
 ```text
 SignalForge/
-├── api/            # FastAPI routes and runtime boundaries
-├── processors/     # research, relevance, tracking and behavior logic
-├── dashboard/      # React + TypeScript research workspace
-├── scrapers/       # public-source collectors and adapters
-├── config/         # configuration and source policies
-├── database/       # optional legacy database layer
-├── scheduler/      # scheduled jobs
-├── benchmarks/     # regression / benchmark fixtures
-├── docs/           # architecture, demo and limitations
+├── api/                 # FastAPI routes and runtime boundaries
+├── processors/          # research, relevance, tracking and behavior logic
+├── dashboard/           # React + TypeScript research workspace
+├── scrapers/            # public-source collectors and adapters
+├── config/              # configuration and source policies
+├── database/            # optional legacy database layer
+├── scheduler/           # scheduled jobs
+├── benchmarks/          # benchmark fixtures
+├── tests/
+│   └── history/         # preserved historical acceptance / regression evidence
+├── scripts/
+│   └── history/         # preserved historical experiment / audit runners
+├── assets/              # portfolio diagrams
+├── docs/                # architecture, demo, limitations and repository audit
 ├── requirements.txt
 └── README.md
 ```
 
-root 仍保留大量歷史 regression / audit scripts，因為 SignalForge 是從多輪實驗逐步演進而來；目前主要產品路徑集中在 `api/`、`processors/` 與 `dashboard/`。
+目前 canonical product path 是 `api/`、`processors/`、`dashboard/`。root 只保留仍有 runtime/import contract 的 entrypoints、operational scripts，以及少量目前仍代表系統邊界的 regression checks。歷史測試與實驗腳本沒有刪除，而是移到 `tests/history/` 與 `scripts/history/`。完整整理原則見 [Repository Audit](docs/REPOSITORY_AUDIT.md)。
 
 ---
 
